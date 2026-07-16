@@ -1,705 +1,743 @@
-import { useState, useEffect } from 'react';
-import SubpageList from '../features/wiki/components/subpage-list';
-import WikiEditor from '../features/wiki/components/wiki-editor';
-import { Page } from '../features/wiki/types';
+import { useState, useRef } from 'react';
+import logoDocs from '../assets/logo_docs.png'; 
+import QaTestSuite from '../components/qatestsuite'; 
 
-import TestCard from '../features/testing/components/test-card';
-import CoverageStats from '../features/testing/components/coverage-stats';
-import { TestCase } from '../features/testing/types';
+// --- TYPES & INTERFACES ---
+interface DocPage {
+  id: string;
+  title: string;
+  content: string;
+}
 
-interface Tag {
+interface QaSuiteItem {
+  id: string;
+  title: string;
+}
+
+interface ProjectSpecs {
   name: string;
-  count: number;
-}
-
-interface AuditLog {
-  version: string;
-  date: string;
-  author: string;
-  action: string;
-}
-
-interface ProjectMetadata {
-  projectName: string;
-  about: string;
-  objectives: string;
-  requestor: string;
+  description: string;
+  due: string;
+  commenced: string;
   devAssignee: string;
   qaAssignee: string;
-  baAssignee: string;
+  baAssigned: string;
   status: string;
-}
-
-interface QuickNote {
-  id: string;
-  author: string;
-  text: string;
-  timestamp: string;
+  progress: string;
 }
 
 interface DocumentationProps {
   isDarkMode: boolean;
   onBackToProjects: () => void;
+  selectedProject?: any; 
 }
 
-export default function Documentation({ isDarkMode, onBackToProjects }: DocumentationProps) {
-  const [activeTab, setActiveTab] = useState<'docs' | 'testing'>('docs');
+const DEFAULT_PROJECT_SPECS: ProjectSpecs = {
+  name: "New Workspace Project",
+  description: "Provide a description for this project workspace...",
+  due: "2026-12-31",
+  commenced: "2026-07-16",
+  devAssignee: "Unassigned",
+  qaAssignee: "Unassigned",
+  baAssigned: "Unassigned",
+  status: "Active",
+  progress: "Todo"
+};
 
-  // --- Quick Notes / Boss Comments State (With LocalStorage Persistence) ---
-  const [notes, setNotes] = useState<QuickNote[]>(() => {
-    const saved = localStorage.getItem('pd_project_notes');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: 'note-1',
-        author: 'Boss (Product Owner)',
-        text: 'Please ensure the validate login endpoint strictly matches the v2 specs from our API directory.',
-        timestamp: 'July 16, 2026 at 03:45 PM'
-      }
-    ];
-  });
-  const [isNotesOpen, setIsNotesOpen] = useState(false);
-  const [newNoteText, setNewNoteText] = useState('');
-  const [noteAuthor, setNoteAuthor] = useState('Boss');
-
-  // Save notes to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('pd_project_notes', JSON.stringify(notes));
-  }, [notes]);
-
-  const handleAddNote = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNoteText.trim()) return;
-
-    const now = new Date();
-    const formattedDate = now.toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    }) + ' at ' + now.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-
-    const newNote: QuickNote = {
-      id: `note-${Date.now()}`,
-      author: noteAuthor.trim() || 'Anonymous User',
-      text: newNoteText.trim(),
-      timestamp: formattedDate
-    };
-
-    setNotes([...notes, newNote]);
-    setNewNoteText('');
-  };
-
-  const handleDeleteNote = (id: string) => {
-    if (confirm("Remove this note permanently?")) {
-      setNotes(notes.filter(n => n.id !== id));
+export default function Documentation({ isDarkMode, onBackToProjects, selectedProject }: DocumentationProps) {
+  
+  // Dynamic state resolver: Safely loads from either localStorage (most robust) or selectedProject prop fallback
+  const [projectSpecs, setProjectSpecs] = useState<ProjectSpecs>(() => {
+    const cached = localStorage.getItem('qa_ba_current_project');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return {
+        name: parsed.name,
+        description: parsed.about,
+        due: "2026-12-31",
+        commenced: parsed.createdDate,
+        devAssignee: parsed.devAssignee,
+        qaAssignee: parsed.qaAssignee,
+        baAssigned: parsed.baAssignee,
+        status: parsed.status || "Active",
+        progress: "Todo"
+      };
     }
-  };
-
-  // --- Sub-Pages State & Management ---
-  const [pages, setPages] = useState<Page[]>([
-    { id: '1', title: 'Overview', isActive: true },
-    { id: '2', title: 'User Journey Flow', isActive: false },
-    { id: '3', title: 'API Integration Specifications', isActive: false },
-  ]);
-  const [editingPageId, setEditingPageId] = useState<string | null>(null);
-  const [editPageTitle, setEditPageTitle] = useState('');
-
-  const handleAddPage = () => {
-    const newId = (pages.length + 1).toString();
-    const newPage: Page = {
-      id: newId,
-      title: `New Page ${newId}`,
-      isActive: false
-    };
-    setPages([...pages, newPage]);
-  };
-
-  const handleSelectPage = (id: string) => {
-    setPages(pages.map(p => ({ ...p, isActive: p.id === id })));
-  };
-
-  const handleStartEditPage = (page: Page, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingPageId(page.id);
-    setEditPageTitle(page.title);
-  };
-
-  const handleSavePageTitle = (id: string) => {
-    setPages(pages.map(p => p.id === id ? { ...p, title: editPageTitle } : p));
-    setEditingPageId(null);
-  };
-
-  const handleDeletePage = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updated = pages.filter(p => p.id !== id);
-    if (updated.length > 0 && pages.find(p => p.id === id)?.isActive) {
-      updated[0].isActive = true;
-    }
-    setPages(updated);
-  };
-
-  // --- Dynamic Tags CRUD Management ---
-  const [tags, setTags] = useState<Tag[]>([
-    { name: 'payment', count: 0 },
-    { name: 'maintenance', count: 0 },
-    { name: 'reports', count: 4 },
-  ]);
-  const [newTagName, setNewTagName] = useState('');
-  const [isAddingTag, setIsAddingTag] = useState(false);
-
-  const handleAddTag = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanName = newTagName.trim().toLowerCase();
-    if (!cleanName) return;
     
-    if (tags.some(t => t.name === cleanName)) {
+    // Fallback if accessed out of order
+    return {
+      name: selectedProject?.name || DEFAULT_PROJECT_SPECS.name,
+      description: selectedProject?.about || DEFAULT_PROJECT_SPECS.description,
+      due: DEFAULT_PROJECT_SPECS.due,
+      commenced: selectedProject?.createdDate || DEFAULT_PROJECT_SPECS.commenced,
+      devAssignee: selectedProject?.devAssignee || DEFAULT_PROJECT_SPECS.devAssignee,
+      qaAssignee: selectedProject?.qaAssignee || DEFAULT_PROJECT_SPECS.qaAssignee,
+      baAssigned: selectedProject?.baAssignee || DEFAULT_PROJECT_SPECS.baAssigned,
+      status: selectedProject?.status || DEFAULT_PROJECT_SPECS.status,
+      progress: DEFAULT_PROJECT_SPECS.progress,
+    };
+  });
+
+  // Dynamic user mapping for auditing logs (no hardcoded "Arra")
+  const currentUser = projectSpecs.baAssigned !== "Unassigned" ? projectSpecs.baAssigned : "System User";
+
+  // Document states
+  const [pages, setPages] = useState<DocPage[]>([]);
+  const [qaSuites, setQaSuites] = useState<QaSuiteItem[]>([]);
+
+  // Editor states
+  const [editorMode, setEditorMode] = useState<'visual' | 'code'>('visual');
+  const [newPageTitle, setNewPageTitle] = useState<string>('');
+  const [newQaSuiteTitle, setNewQaSuiteTitle] = useState<string>('');
+  const [aiPrompt, setAiPrompt] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [notes, setNotes] = useState<string>('');
+  const [isAiPanelOpen, setIsAiPanelOpen] = useState<boolean>(true);
+
+  // Word Tags State
+  const [wordTags, setWordTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState<string>('');
+
+  const sectionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  const [auditLogs, setAuditLogs] = useState([
+    { timestamp: 'Just Now', user: currentUser, action: 'Initialized clean project workspace.' }
+  ]);
+
+  const handlePageContentChange = (id: string, newContent: string) => {
+    setPages(prev => prev.map(p => p.id === id ? { ...p, content: newContent } : p));
+  };
+
+  const scrollToSection = (id: string) => {
+    sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleAddNewPage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPageTitle.trim()) return;
+    const newId = `page-${Date.now()}`;
+    const newPageObj: DocPage = {
+      id: newId,
+      title: newPageTitle,
+      content: `<h2>📋 ${newPageTitle}</h2><hr/><p>Start typing content for ${newPageTitle} directly here...</p>`
+    };
+    setPages(prev => [...prev, newPageObj]);
+    setNewPageTitle('');
+    logAudit(`Added BA Document Page: "${newPageTitle}"`);
+    setTimeout(() => scrollToSection(newId), 100);
+  };
+
+  const handleAddNewQaSuite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newQaSuiteTitle.trim()) return;
+    const newId = `qa-suite-${Date.now()}`;
+    setQaSuites(prev => [...prev, { id: newId, title: newQaSuiteTitle }]);
+    setNewQaSuiteTitle('');
+    logAudit(`Added QA Test Suite: "${newQaSuiteTitle}"`);
+    setTimeout(() => scrollToSection(newId), 100);
+  };
+
+  const updateSpecField = (field: keyof ProjectSpecs, value: string) => {
+    setProjectSpecs(prev => ({ ...prev, [field]: value }));
+    logAudit(`Updated ${field.replace(/([A-Z])/g, ' $1')} to "${value}"`);
+  };
+
+  const logAudit = (action: string) => {
+    setAuditLogs(prev => [
+      { timestamp: 'Just Now', user: currentUser, action },
+      ...prev
+    ]);
+  };
+
+  const handleAddWordTag = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanTag = newTagInput.trim();
+    if (!cleanTag) return;
+    if (wordTags.includes(cleanTag)) {
       alert("Tag already exists!");
       return;
     }
-
-    setTags([...tags, { name: cleanName, count: 0 }]);
-    setNewTagName('');
-    setIsAddingTag(false);
+    setWordTags(prev => [...prev, cleanTag]);
+    setNewTagInput('');
+    logAudit(`Added tag: "${cleanTag}"`);
   };
 
-  const handleDeleteTag = (name: string) => {
-    if (confirm(`Are you sure you want to delete the tag [${name}]?`)) {
-      setTags(tags.filter(t => t.name !== name));
+  const handleRemoveWordTag = (tagToRemove: string) => {
+    setWordTags(prev => prev.filter(t => t !== tagToRemove));
+    logAudit(`Removed tag: "${tagToRemove}"`);
+  };
+
+  const handleAiGenerate = async (promptText: string) => {
+    if (pages.length === 0) {
+      alert("Please create at least one BA Page to append AI requirements!");
+      return;
     }
+    setIsGenerating(true);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    
+    const aiResponse = `
+<h3>✨ AI Generated Requirement Additions</h3>
+<ul>
+  <li><strong>Functional Rule:</strong> The system must enforce high-security inputs before parsing data.</li>
+  <li><strong>QA Assertion:</strong> Verify transaction latency returns sub-200ms payloads under peak loads.</li>
+</ul>`;
+    
+    handlePageContentChange(pages[0].id, pages[0].content + aiResponse);
+    logAudit(`Appended AI suggestion to: "${pages[0].title}"`);
+
+    setIsGenerating(false);
+    setAiPrompt('');
   };
 
-  // --- Static/Audit Specs ---
-  const [auditLogs] = useState<AuditLog[]>([
-    { version: 'v1.0 - initialized', date: 'July 16, 2026 at 09:20 AM', author: 'Admin', action: 'project workspace' },
-    { version: 'v1.1 - updated metadata', date: 'July 16, 2026 at 09:55 AM', author: 'Admin', action: 'project metadata specs' },
-  ]);
-
-  const [metadata, setMetadata] = useState<ProjectMetadata>({
-    projectName: 'PD system',
-    about: 'PD system',
-    objectives: 'PD system',
-    requestor: 'ISD',
-    devAssignee: 'All',
-    qaAssignee: 'Arra',
-    baAssignee: 'Arra',
-    status: 'Active',
-  });
-
-  const [isEditingSpecs, setIsEditingSpecs] = useState(false);
-  const [isEditingContent, setIsEditingContent] = useState(false);
-  const [blogContent, setBlogContent] = useState(
-    `Welcome to the PD system workspace! Use the document portal on the side panel or click edit to update this wiki description.`
-  );
-
-  const [tempMetadata, setTempMetadata] = useState<ProjectMetadata>({ ...metadata });
-  const [tempContent, setTempContent] = useState(blogContent);
-
-  // --- Test Case Management State & Functions ---
-  const [testCases, setTestCases] = useState<TestCase[]>([
-    { id: 'TC-101', title: 'Validate Admin Login Access Token generation', steps: '1. Input correct credentials\n2. Trigger login button', expected: 'Validate status 200 JSON payload includes access_token key', status: 'Passed', assignedTo: 'Arra' },
-    { id: 'TC-102', title: 'Verify creation of new Project record with empty fields', steps: '1. Navigate to Project modal\n2. Attempt save with blank name', expected: 'Form error warning alerts user to complete fields', status: 'Failed', assignedTo: 'Arra' },
-    { id: 'TC-103', title: 'Toggling Status on inactive user blocks active session', steps: '1. Locate active user\n2. Toggle status to Inactive\n3. Perform transaction on workspace', expected: 'Session termination forces authentication redirect screen', status: 'Untested', assignedTo: 'Arra' }
-  ]);
-
-  const [isTcModalOpen, setIsTcModalOpen] = useState(false);
-  const [editingTestCase, setEditingTestCase] = useState<TestCase | null>(null);
-
-  const [tcTitle, setTcTitle] = useState('');
-  const [tcSteps, setTcSteps] = useState('');
-  const [tcExpected, setTcExpected] = useState('');
-  const [tcStatus, setTcStatus] = useState<TestCase['status']>('Untested');
-  const [tcAssignee, setTcAssignee] = useState('Arra');
-
-  const handleOpenCreateTc = () => {
-    setEditingTestCase(null);
-    setTcTitle('');
-    setTcSteps('');
-    setTcExpected('');
-    setTcStatus('Untested');
-    setTcAssignee('Arra');
-    setIsTcModalOpen(true);
+  const formatVisual = (command: string, value: string = '') => {
+    document.execCommand(command, false, value);
   };
 
-  const handleOpenEditTc = (tc: TestCase) => {
-    setEditingTestCase(tc);
-    setTcTitle(tc.title);
-    setTcSteps(tc.steps);
-    setTcExpected(tc.expected);
-    setTcStatus(tc.status);
-    setTcAssignee(tc.assignedTo);
-    setIsTcModalOpen(true);
-  };
+  const insertTable = () => {
+    const rowsInput = prompt("Enter number of rows:", "3");
+    const colsInput = prompt("Enter number of columns:", "3");
+    
+    if (!rowsInput || !colsInput) return;
+    const rows = parseInt(rowsInput);
+    const cols = parseInt(colsInput);
+    
+    if (isNaN(rows) || isNaN(cols)) return;
 
-  const handleSaveTestCase = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingTestCase) {
-      setTestCases(testCases.map(tc => tc.id === editingTestCase.id ? {
-        ...tc,
-        title: tcTitle,
-        steps: tcSteps,
-        expected: tcExpected,
-        status: tcStatus,
-        assignedTo: tcAssignee
-      } : tc));
-    } else {
-      const nextNum = testCases.length > 0 ? Math.max(...testCases.map(t => parseInt(t.id.split('-')[1]))) + 1 : 101;
-      const newCase: TestCase = {
-        id: `TC-${nextNum}`,
-        title: tcTitle,
-        steps: tcSteps,
-        expected: tcExpected,
-        status: 'Untested',
-        assignedTo: tcAssignee
-      };
-      setTestCases([...testCases, newCase]);
+    let tableHTML = `<table style="width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; border: 1px solid #cbd5e1;">`;
+    tableHTML += `<tr style="background-color: #f8fafc;">`;
+    for (let j = 0; j < cols; j++) {
+      tableHTML += `<th style="border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-weight: bold; color: #10065F;">Header ${j + 1}</th>`;
     }
-    setIsTcModalOpen(false);
-  };
+    tableHTML += `</tr>`;
 
-  const handleDeleteTestCase = (id: string) => {
-    if (confirm("Are you sure you want to delete this test case?")) {
-      setTestCases(testCases.filter(tc => tc.id !== id));
+    for (let i = 0; i < rows - 1; i++) {
+      tableHTML += `<tr>`;
+      for (let j = 0; j < cols; j++) {
+        tableHTML += `<td style="border: 1px solid #cbd5e1; padding: 8px; color: #334155;">Data</td>`;
+      }
+      tableHTML += `</tr>`;
     }
+    tableHTML += `</table><p></p>`;
+    formatVisual('insertHTML', tableHTML);
   };
 
-  const updateTestStatus = (id: string, nextStatus: TestCase['status']) => {
-    setTestCases(testCases.map(tc => tc.id === id ? { ...tc, status: nextStatus } : tc));
-  };
+  const handleExportDoc = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
-  const handleSaveSpecs = () => {
-    setMetadata({ ...tempMetadata });
-    setIsEditingSpecs(false);
-  };
+    const tagsHtmlString = wordTags.map(tag => `<span style="background: rgba(16, 6, 95, 0.08); color: #10065F; padding: 2px 8px; font-size: 10px; font-weight: bold; border-radius: 4px; margin-right: 6px;">#${tag}</span>`).join('');
 
-  const handleSaveContent = () => {
-    setBlogContent(tempContent);
-    setIsEditingContent(false);
+    const pageHtmlSections = pages.map((p, index) => `
+      <div class="print-page">
+        <div class="print-header">
+          <div class="logo-area">
+            <div class="logo-wrapper">
+              <img src="${logoDocs}" alt="Paramount Logo" style="height: 54px; width: auto; margin-right: 12px;" />
+            </div>
+          </div>
+          <div class="doc-meta">
+            <strong>PROJECT:</strong> ${projectSpecs.name}<br/>
+            <strong>DATE:</strong> ${new Date().toLocaleDateString()}
+          </div>
+        </div>
+
+        <div class="print-body">
+          ${index === 0 && wordTags.length > 0 ? `<div style="margin-bottom: 20px;">${tagsHtmlString}</div>` : ''}
+          ${p.content}
+        </div>
+
+        <div class="print-footer">
+          <div class="footer-box">
+            <div class="footer-page-accent">${index + 1}</div>
+            <div class="footer-desc">
+              <span class="desc-team">BA/QA Team  |  Systems and Development</span>
+              <span class="desc-company">Paramount Life & General Insurance Inc.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join('<div class="page-break"></div>');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${projectSpecs.name} - Official BRD</title>
+          <style>
+            @page { size: A4 portrait; margin: 0; }
+            body { font-family: 'Segoe UI', sans-serif; color: #1e293b; background: #f1f5f9; margin: 0; padding: 0; }
+            .no-print-banner { background: #eff6ff; padding: 14px; text-align: center; font-size: 13px; color: #1e40af; font-weight: bold; border-bottom: 1px solid #bfdbfe; }
+            .document-canvas { max-width: 800px; margin: 30px auto; }
+            .print-page { background: white; width: 210mm; height: 297mm; box-sizing: border-box; padding: 25mm 20mm; position: relative; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+            .page-break { height: 0; page-break-after: always; }
+            .print-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
+            .doc-meta { text-align: right; font-size: 11px; color: #64748b; line-height: 1.4; }
+            .print-body { flex-grow: 1; font-size: 13px; line-height: 1.6; color: #1e293b; }
+            h2 { font-size: 18px; color: #10065F; margin-top: 0; }
+            h3 { font-size: 14px; color: #10065F; }
+            h4 { font-size: 12px; color: #334155; }
+            ul { padding-left: 20px; }
+            li { margin-bottom: 6px; }
+            table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; }
+            th, td { border: 1.5px solid #cbd5e1 !important; padding: 8px !important; }
+            th { background-color: #f8fafc !important; font-weight: bold; color: #10065F; }
+            .print-footer { padding-top: 15px; }
+            .footer-box { border: 1.5px solid #10065F; display: flex; align-items: stretch; height: 48px; }
+            .footer-page-accent { background-color: #10065F; color: white; width: 50px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; }
+            .footer-desc { display: flex; flex-direction: column; justify-content: center; padding-left: 15px; }
+            .desc-team { font-size: 11px; color: #1e293b; font-weight: bold; }
+            .desc-company { font-size: 11px; color: #334155; }
+            @media print {
+              .no-print-banner { display: none !important; }
+              body { background: white; }
+              .document-canvas { margin: 0; }
+              .print-page { box-shadow: none; margin-bottom: 0; page-break-inside: avoid; page-break-after: always; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print-banner">
+            🖨️ Press <strong style="text-decoration: underline;">Ctrl + P</strong> and choose 'Save as PDF' to generate the official document bundle.
+          </div>
+          <div class="document-canvas">${pageHtmlSections}</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   return (
-    <div className={`min-h-screen flex font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-brand-lightBg text-brand-paramount'} transition-all duration-300 relative overflow-x-hidden`}>
+    <div className="flex flex-col h-[calc(100vh-73px)]">
       
-      {/* 1. Left Sidebar Nav */}
-      <aside className="w-80 border-r border-slate-200 dark:border-slate-800 p-6 flex flex-col space-y-8 bg-white dark:bg-neutral-cardDark z-10">
-        <button onClick={onBackToProjects} className="text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-brand-accent transition-all text-left">
-          ← Back to Projects
-        </button>
-
-        <div className="flex flex-col space-y-2 pb-6 border-b border-slate-100 dark:border-slate-800">
+      {/* Utility Bar */}
+      <div className="bg-slate-50 dark:bg-neutral-cardDark/40 border-b border-slate-100 dark:border-slate-800/80 px-6 py-3 flex justify-between items-center">
+        <div className="flex items-center space-x-4">
           <button 
-            onClick={() => setActiveTab('docs')}
-            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'docs' ? 'bg-brand-paramount text-white' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'}`}
+            onClick={onBackToProjects}
+            className="text-xs font-bold text-slate-500 hover:text-brand-paramount dark:hover:text-white flex items-center space-x-1.5 transition-all"
           >
-            📓 Specifications Wiki
+            <span>← Back to Projects</span>
           </button>
+          <span className="text-xs text-slate-300 dark:text-slate-600">|</span>
+          
           <button 
-            onClick={() => setActiveTab('testing')}
-            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'testing' ? 'bg-brand-paramount text-white' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'}`}
+            onClick={() => setIsAiPanelOpen(!isAiPanelOpen)}
+            className="px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
           >
-            🧪 Test Management
+            {isAiPanelOpen ? '⬅️ Collapse Nav' : '📂 Open Doc Nav'}
           </button>
         </div>
 
-        {activeTab === 'docs' ? (
-          <>
-            <SubpageList 
-              pages={pages}
-              editingPageId={editingPageId}
-              editPageTitle={editPageTitle}
-              setEditPageTitle={setEditPageTitle}
-              onSelectPage={handleSelectPage}
-              onAddPage={handleAddPage}
-              onStartEditPage={handleStartEditPage}
-              onSavePageTitle={handleSavePageTitle}
-              onDeletePage={handleDeletePage}
-            />
+        <div className="flex items-center space-x-2">
+          <div className="flex bg-slate-100 dark:bg-neutral-cardDark/80 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+            <button 
+              onClick={() => setEditorMode('visual')}
+              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide ${editorMode === 'visual' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+            >
+              🎨 Visual Mode
+            </button>
+            <button 
+              onClick={() => setEditorMode('code')}
+              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide ${editorMode === 'code' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+            >
+              💻 HTML Code Mode
+            </button>
+          </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Tags</h3>
-                <button onClick={() => setIsAddingTag(!isAddingTag)} className="text-xs font-bold text-brand-accent hover:underline">
-                  {isAddingTag ? 'Cancel' : '+ Add Tag'}
+          <button 
+            onClick={handleExportDoc}
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-sm"
+          >
+            📄 Save as Docs / PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* Left Side Navigation Panel */}
+        {isAiPanelOpen && (
+          <div className="w-72 bg-white dark:bg-neutral-cardDark/60 border-r border-slate-100 dark:border-slate-800/80 p-5 flex flex-col justify-between overflow-y-auto transition-all space-y-6">
+            <div className="space-y-6">
+              
+              {/* BA Document Pages */}
+              <div>
+                <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+                  BA Document Pages
+                </h3>
+                <div className="space-y-1 mb-3">
+                  {pages.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => scrollToSection(p.id)}
+                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-neutral-obsidian/40 border-l-2 border-transparent hover:border-blue-500 transition-all block truncate"
+                    >
+                      📄 {p.title}
+                    </button>
+                  ))}
+                  {pages.length === 0 && (
+                    <p className="text-[10px] italic text-slate-400 p-2 bg-slate-50 dark:bg-neutral-obsidian/20 rounded-lg text-center">No BA pages created.</p>
+                  )}
+                </div>
+                
+                <form onSubmit={handleAddNewPage} className="flex space-x-1">
+                  <input 
+                    type="text"
+                    value={newPageTitle}
+                    onChange={(e) => setNewPageTitle(e.target.value)}
+                    placeholder="Add BA Page..."
+                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
+                  />
+                  <button type="submit" className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-extrabold">＋</button>
+                </form>
+              </div>
+
+              {/* QA Test Suites */}
+              <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4">
+                <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+                  QA Test Suites
+                </h3>
+                <div className="space-y-1 mb-3">
+                  {qaSuites.map((suite) => (
+                    <button
+                      key={suite.id}
+                      onClick={() => scrollToSection(suite.id)}
+                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 border-l-2 border-transparent hover:border-emerald-500 transition-all block truncate"
+                    >
+                      🧪 {suite.title}
+                    </button>
+                  ))}
+                  {qaSuites.length === 0 && (
+                    <p className="text-[10px] italic text-slate-400 p-2 bg-slate-50 dark:bg-neutral-obsidian/20 rounded-lg text-center font-semibold text-emerald-500/80">No QA suites created.</p>
+                  )}
+                </div>
+
+                <form onSubmit={handleAddNewQaSuite} className="flex space-x-1">
+                  <input 
+                    type="text"
+                    value={newQaSuiteTitle}
+                    onChange={(e) => setNewQaSuiteTitle(e.target.value)}
+                    placeholder="Add QA Suite..."
+                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
+                  />
+                  <button type="submit" className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-extrabold">＋</button>
+                </form>
+              </div>
+
+              {/* Document Tags */}
+              <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4">
+                <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+                  Document Tags
+                </h3>
+                <div className="flex flex-wrap gap-1.5 mb-2.5 max-h-24 overflow-y-auto">
+                  {wordTags.map((tag) => (
+                    <span 
+                      key={tag} 
+                      className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-500 dark:text-blue-400 text-[10px] font-extrabold gap-1"
+                    >
+                      #{tag}
+                      <button 
+                        type="button" 
+                        onClick={() => handleRemoveWordTag(tag)}
+                        className="hover:bg-blue-500/20 text-[11px] leading-none rounded-full w-3.5 h-3.5 inline-flex items-center justify-center"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <form onSubmit={handleAddWordTag} className="flex space-x-1">
+                  <input 
+                    type="text"
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    placeholder="Add tag..."
+                    className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
+                  />
+                  <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-extrabold">＋</button>
+                </form>
+              </div>
+
+              {/* AI Companion */}
+              <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 space-y-3">
+                <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  BA AI Companion
+                </h3>
+                <textarea 
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="Ask AI to write specs..."
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian/50 text-brand-paramount dark:text-white placeholder-slate-400 h-24 resize-none"
+                />
+                <button
+                  disabled={isGenerating || !aiPrompt.trim()}
+                  onClick={() => handleAiGenerate(aiPrompt)}
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-extrabold disabled:opacity-50"
+                >
+                  {isGenerating ? '⏳ Appending...' : '✨ Append to Document'}
                 </button>
               </div>
 
-              {isAddingTag && (
-                <form onSubmit={handleAddTag} className="mb-4">
-                  <input
-                    type="text"
-                    value={newTagName}
-                    onChange={(e) => setNewTagName(e.target.value)}
-                    placeholder="tagname"
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-800 dark:text-white"
-                    autoFocus
-                  />
-                </form>
-              )}
-
-              <div className="space-y-2">
-                {tags.map(tag => (
-                  <div key={tag.name} className="flex justify-between items-center text-xs group">
-                    <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 font-semibold text-slate-600 dark:text-slate-400">
-                      [{tag.name}]
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-slate-400 font-medium group-hover:hidden">{tag.count} used</span>
-                      <button onClick={() => handleDeleteTag(tag.name)} className="hidden group-hover:inline-block text-red-500 hover:underline text-[10px]">
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
-          </>
-        ) : (
-          <CoverageStats testCases={testCases} />
+          </div>
         )}
 
-        <div className="flex-1 flex flex-col min-h-0 pt-4 border-t border-slate-100 dark:border-slate-800/50">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Audit Ledger</h3>
-          <div className="space-y-4 overflow-y-auto flex-1">
-            {auditLogs.map((log, index) => (
-              <div key={index} className="text-xs border-l-2 border-slate-200 dark:border-slate-800 pl-3">
-                <p className="font-bold text-brand-accent">{log.version}</p>
-                <p className="text-slate-400 mt-0.5">{log.date}</p>
+        {/* Center: Work Canvas */}
+        <div className="flex-1 flex flex-col bg-slate-100/50 dark:bg-neutral-obsidian/20 overflow-y-auto">
+          
+          {editorMode === 'visual' && (
+            <div className="bg-white dark:bg-neutral-cardDark border-b border-slate-100 dark:border-slate-800 sticky top-0 z-10 px-6 py-2.5 flex items-center space-x-2.5 shadow-sm">
+              <button onClick={() => formatVisual('bold')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-black dark:text-white">B</button>
+              <button onClick={() => formatVisual('italic')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs italic font-black dark:text-white">I</button>
+              <button onClick={() => formatVisual('underline')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs underline font-black dark:text-white">U</button>
+              <span className="text-slate-300">|</span>
+              
+              <select 
+                onChange={(e) => formatVisual('fontName', e.target.value)}
+                className="text-[11px] font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-neutral-cardDark text-slate-700 dark:text-slate-200 rounded px-2 py-1 outline-none"
+              >
+                <option value="Segoe UI">Default Font</option>
+                <option value="Courier New">Typewriter (Monospace)</option>
+                <option value="Georgia">Classic Serif</option>
+                <option value="Arial">Modern Sans</option>
+              </select>
+
+              <span className="text-slate-300">|</span>
+              <button onClick={() => formatVisual('formatBlock', '<h2>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white">H2</button>
+              <button onClick={() => formatVisual('formatBlock', '<h3>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white">H3</button>
+              <span className="text-slate-300">|</span>
+              <button onClick={() => formatVisual('insertUnorderedList')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs dark:text-white">• List</button>
+              
+              <span className="text-slate-300">|</span>
+              <button 
+                onClick={insertTable} 
+                className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-bold dark:text-white"
+              >
+                Table
+              </button>
+            </div>
+          )}
+
+          <div className="bg-slate-50/50 dark:bg-neutral-cardDark/20 px-5 py-1.5 border-b border-slate-100 dark:border-slate-800/80 flex justify-between items-center text-[10px] text-slate-400">
+            <span>Viewing: <strong className="text-slate-600 dark:text-slate-300">Continuous Workspace Scroll (Google Docs Style)</strong></span>
+            <span>Highlight text to apply font or styling settings above</span>
+          </div>
+
+          <div className="p-8 max-w-4xl w-full mx-auto space-y-8 flex-1">
+            {pages.map((p) => (
+              <div 
+                key={p.id} 
+                ref={el => { sectionRefs.current[p.id] = el; }}
+                className="bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-slate-800/60 rounded-xl shadow-md p-10 min-h-[500px] flex flex-col transition-all"
+              >
+                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/40 pb-2 mb-6">
+                  <span className="text-[10px] font-black tracking-widest text-blue-500 uppercase">📄 Section: {p.title}</span>
+                  <span className="text-[9px] text-slate-400">Word-count aware</span>
+                </div>
+
+                {editorMode === 'visual' ? (
+                  <div 
+                    contentEditable
+                    dangerouslySetInnerHTML={{ __html: p.content }}
+                    onBlur={(e) => handlePageContentChange(p.id, e.currentTarget.innerHTML)}
+                    className="flex-1 outline-none text-xs text-brand-paramount dark:text-slate-200 prose dark:prose-invert max-w-none space-y-3 leading-relaxed"
+                    style={{ minHeight: '400px' }}
+                  />
+                ) : (
+                  <textarea
+                    value={p.content}
+                    onChange={(e) => handlePageContentChange(p.id, e.target.value)}
+                    className="flex-1 w-full outline-none font-mono text-xs text-brand-paramount dark:text-emerald-400 bg-slate-50 dark:bg-neutral-obsidian/40 border border-slate-200 dark:border-slate-800 rounded-lg p-5 leading-relaxed"
+                    style={{ minHeight: '400px' }}
+                  />
+                )}
               </div>
             ))}
-          </div>
-        </div>
-      </aside>
 
-      {/* 2. Main content display container */}
-      <main className="flex-1 p-8 max-w-5xl mx-auto space-y-8 z-0">
-        {activeTab === 'docs' && (
-          <>
-            <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-6">
-              <div>
-                <h1 className="text-3xl font-extrabold tracking-tight">{metadata.projectName}</h1>
-                <p className="text-sm text-slate-400 mt-1">Written requirements specification wiki and narrative board.</p>
-              </div>
-              <div className="flex space-x-2">
-                <button onClick={() => { setTempContent(blogContent); setIsEditingContent(true); }} className="px-4 py-2 bg-brand-paramount dark:bg-brand-accent text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow hover:opacity-90 transition-all">✍️ Edit Content</button>
-                <button className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">📥 Export DOCX</button>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-neutral-cardDark rounded-2xl p-6 border border-slate-100 dark:border-slate-800/80 shadow-sm relative">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-400">Project Specifications</h2>
-                <button onClick={() => { setTempMetadata({ ...metadata }); setIsEditingSpecs(true); }} className="text-xs font-bold text-brand-accent hover:underline">Edit Specs</button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 text-sm">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">About the Project</p>
-                  <p className="font-semibold text-brand-paramount dark:text-white">{metadata.about}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Objectives</p>
-                  <p className="font-semibold text-brand-paramount dark:text-white">{metadata.objectives}</p>
-                </div>
-                <div className="grid grid-cols-4 gap-4 col-span-1 md:col-span-2 mt-2 pt-4 border-t border-slate-100 dark:border-slate-800/50">
-                  <div><span className="text-xs text-slate-400 block font-bold uppercase">Requestor</span><span className="font-bold text-brand-paramount dark:text-slate-200">{metadata.requestor}</span></div>
-                  <div><span className="text-xs text-slate-400 block font-bold uppercase">Dev</span><span className="font-bold text-brand-paramount dark:text-slate-200">{metadata.devAssignee}</span></div>
-                  <div><span className="text-xs text-slate-400 block font-bold uppercase">QA</span><span className="font-bold text-brand-paramount dark:text-slate-200">{metadata.qaAssignee}</span></div>
-                  <div><span className="text-xs text-slate-400 block font-bold uppercase">BA</span><span className="font-bold text-brand-paramount dark:text-slate-200">{metadata.baAssignee}</span></div>
-                </div>
-              </div>
-            </div>
-
-            <WikiEditor 
-              isEditingContent={isEditingContent}
-              blogContent={blogContent}
-              tempContent={tempContent}
-              setTempContent={setTempContent}
-              setIsEditingContent={setIsEditingContent}
-              onSaveContent={handleSaveContent}
-              projectName={metadata.projectName}
-            />
-          </>
-        )}
-
-        {activeTab === 'testing' && (
-          <>
-            <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-6">
-              <div>
-                <h1 className="text-3xl font-extrabold tracking-tight">TestSuite Management</h1>
-                <p className="text-sm text-slate-400 mt-1">Organize test matrices, define expected assertions, and log results.</p>
-              </div>
-              <button onClick={handleOpenCreateTc} className="px-5 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider text-white bg-brand-accent hover:opacity-90 transition-all shadow-md">
-                + Create Test Case
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {testCases.map(tc => (
-                <TestCard 
-                  key={tc.id}
-                  tc={tc}
-                  onStatusChange={updateTestStatus}
-                  onEdit={handleOpenEditTc}
-                  onDelete={handleDeleteTestCase}
+            {/* QA Test Suites Render */}
+            {qaSuites.map((suite) => (
+              <div 
+                key={suite.id}
+                id={suite.id}
+                ref={el => { sectionRefs.current[suite.id] = el; }}
+                className="scroll-mt-6"
+              >
+                <QaTestSuite 
+                  suiteId={suite.id}
+                  suiteTitle={suite.title}
+                  projectName={projectSpecs.name}
+                  onLogAudit={logAudit} 
                 />
-              ))}
-            </div>
-          </>
-        )}
-      </main>
-
-      {/* --- FLOATING NOTES SLIDEOUT WIDGET --- */}
-      {/* 1. Floating Circle Button */}
-      <button 
-        onClick={() => setIsNotesOpen(!isNotesOpen)}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-brand-accent dark:bg-blue-600 hover:scale-105 active:scale-95 text-white rounded-full shadow-2xl flex items-center justify-center transition-all z-40 border border-white/20"
-        title="Notes & Comments"
-      >
-        {isNotesOpen ? (
-          <span className="text-xl font-bold">✕</span>
-        ) : (
-          <span className="text-2xl">💬</span>
-        )}
-        {notes.length > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-            {notes.length}
-          </span>
-        )}
-      </button>
-
-      {/* 2. Sliding Drawer Panel */}
-      <aside 
-        className={`fixed top-0 right-0 h-full w-96 bg-white dark:bg-neutral-cardDark border-l border-slate-200 dark:border-slate-800 shadow-2xl p-6 transition-transform duration-300 ease-in-out z-30 flex flex-col justify-between ${
-          isNotesOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="border-b border-slate-100 dark:border-slate-800 pb-4 mb-4 flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-bold text-brand-paramount dark:text-white">Workspace Notes</h3>
-              <p className="text-xs text-slate-400">Collaboration & review items for {metadata.projectName}</p>
-            </div>
-          </div>
-
-          {/* Scrollable Notes Ledger */}
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1 mb-4">
-            {notes.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                <span className="text-4xl mb-2">💡</span>
-                <p className="text-sm font-semibold text-slate-400">No notes yet.</p>
-                <p className="text-xs text-slate-400 mt-1">Add suggestions, issues, or reviews here.</p>
               </div>
-            ) : (
-              notes.map(note => (
-                <div key={note.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/80 space-y-1.5 group relative">
-                  <div className="flex justify-between items-start">
-                    <span className="font-bold text-xs text-brand-accent">{note.author}</span>
-                    <button 
-                      onClick={() => handleDeleteNote(note.id)}
-                      className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{note.text}</p>
-                  <span className="text-[10px] text-slate-400 block font-semibold">{note.timestamp}</span>
-                </div>
-              ))
+            ))}
+
+            {pages.length === 0 && qaSuites.length === 0 && (
+              <div className="bg-white dark:bg-neutral-cardDark border border-dashed border-slate-200 dark:border-slate-700/80 rounded-xl p-16 text-center shadow-sm">
+                <span className="text-4xl">📂</span>
+                <h3 className="text-sm font-bold text-brand-paramount dark:text-white mt-3">Clean Workspace Initialized</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  This project directory is currently empty. Use the sidebar on the left to add your first BA document page or QA execution suite!
+                </p>
+              </div>
             )}
-          </div>
 
-          {/* Form to submit comment */}
-          <form onSubmit={handleAddNote} className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-3">
-            <div className="flex gap-2">
-              <input 
-                type="text"
-                value={noteAuthor}
-                onChange={(e) => setNoteAuthor(e.target.value)}
-                placeholder="Author (e.g. Boss)"
-                className="w-1/3 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-accent"
-              />
-              <span className="text-xs text-slate-400 self-center">is writing...</span>
-            </div>
-            
-            <div className="relative">
-              <textarea
-                value={newNoteText}
-                onChange={(e) => setNewNoteText(e.target.value)}
-                placeholder="Type a feedback note..."
-                rows={3}
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-accent"
-              />
-              <button 
-                type="submit"
-                className="mt-2 w-full py-2 bg-brand-paramount dark:bg-brand-accent text-white font-bold text-xs uppercase tracking-wider rounded-lg hover:opacity-90 transition-all"
-              >
-                Post Note
-              </button>
-            </div>
-          </form>
-        </div>
-      </aside>
-
-      {/* Edit Project Specs Modal */}
-      {isEditingSpecs && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-8 shadow-xl border border-slate-100 dark:border-slate-800">
-            <h3 className="text-lg font-bold text-brand-paramount dark:text-white mb-6">Edit Project Specifications</h3>
-            
-            <div className="space-y-4 text-sm">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Project Name</label>
-                <input 
-                  type="text" 
-                  value={tempMetadata.projectName} 
-                  onChange={(e) => setTempMetadata({ ...tempMetadata, projectName: e.target.value })} 
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none text-slate-800 dark:text-white" 
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">About</label>
-                <input 
-                  type="text" 
-                  value={tempMetadata.about} 
-                  onChange={(e) => setTempMetadata({ ...tempMetadata, about: e.target.value })} 
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none text-slate-800 dark:text-white" 
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Objectives</label>
-                <textarea 
-                  value={tempMetadata.objectives} 
-                  onChange={(e) => setTempMetadata({ ...tempMetadata, objectives: e.target.value })} 
-                  rows={3}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none text-slate-800 dark:text-white" 
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Requestor</label>
-                  <input 
-                    type="text" 
-                    value={tempMetadata.requestor} 
-                    onChange={(e) => setTempMetadata({ ...tempMetadata, requestor: e.target.value })} 
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Dev Assignee</label>
-                  <input 
-                    type="text" 
-                    value={tempMetadata.devAssignee} 
-                    onChange={(e) => setTempMetadata({ ...tempMetadata, devAssignee: e.target.value })} 
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">QA Assignee</label>
-                  <input 
-                    type="text" 
-                    value={tempMetadata.qaAssignee} 
-                    onChange={(e) => setTempMetadata({ ...tempMetadata, qaAssignee: e.target.value })} 
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">BA Assignee</label>
-                  <input 
-                    type="text" 
-                    value={tempMetadata.baAssignee} 
-                    onChange={(e) => setTempMetadata({ ...tempMetadata, baAssignee: e.target.value })} 
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white" 
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2 mt-6">
-              <button 
-                onClick={() => setIsEditingSpecs(false)} 
-                className="px-4 py-2.5 border rounded-lg text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleSaveSpecs} 
-                className="px-4 py-2.5 bg-brand-paramount dark:bg-brand-accent text-white text-xs font-bold rounded-lg shadow"
-              >
-                Save Specs
-              </button>
-            </div>
           </div>
         </div>
-      )}
 
-      {/* Test Case Drawer Popup */}
-      {isTcModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-8 shadow-2xl border border-slate-100 dark:border-neutral-800">
-            <h3 className="text-xl font-bold text-brand-paramount dark:text-white mb-6 font-sans">
-              {editingTestCase ? `Modify ${editingTestCase.id}` : 'Create New Test Case'}
+        {/* Right Side Specs Panel */}
+        <div className="w-80 bg-slate-50/40 dark:bg-neutral-cardDark/30 overflow-y-auto p-5 flex flex-col space-y-5 font-sans">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
+              Project Specs & Info
             </h3>
-            <form onSubmit={handleSaveTestCase} className="space-y-4 text-sm font-sans">
+            
+            <div className="bg-white dark:bg-neutral-cardDark/55 border border-slate-100 dark:border-slate-800/50 rounded-xl p-4 space-y-3 shadow-sm text-xs">
+              
+              {/* Project Name */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Test Title</label>
+                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1">Project Name</span>
                 <input 
-                  type="text" required value={tcTitle} onChange={(e) => setTcTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none"
-                  placeholder="Verify validation triggers correctly"
+                  type="text" 
+                  value={projectSpecs.name}
+                  onChange={(e) => updateSpecField('name', e.target.value)}
+                  className="w-full bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-extrabold text-brand-paramount dark:text-white pb-1"
                 />
               </div>
+              
+              {/* Description */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Test Steps</label>
+                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1">Project Description</span>
                 <textarea 
-                  required value={tcSteps} onChange={(e) => setTcSteps(e.target.value)} rows={3}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none"
-                  placeholder="1. Step one&#10;2. Step two"
+                  value={projectSpecs.description}
+                  onChange={(e) => updateSpecField('description', e.target.value)}
+                  className="w-full h-14 bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none text-slate-500 dark:text-slate-300 font-semibold leading-relaxed resize-none"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Expected Assertions</label>
-                <textarea 
-                  required value={tcExpected} onChange={(e) => setTcExpected(e.target.value)} rows={2}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none"
-                  placeholder="Verify state change"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/40 pt-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1">Commenced</span>
+                  <input 
+                    type="date" 
+                    value={projectSpecs.commenced}
+                    onChange={(e) => updateSpecField('commenced', e.target.value)}
+                    className="w-full bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-brand-paramount dark:text-white"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1">Due Date</span>
+                  <input 
+                    type="date" 
+                    value={projectSpecs.due}
+                    onChange={(e) => updateSpecField('due', e.target.value)}
+                    className="w-full bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-red-500"
+                  />
+                </div>
+              </div>
+
+              {/* Assignees */}
+              <div className="border-t border-slate-100 dark:border-slate-800/40 pt-3 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">BA Assigned</span>
+                  <input 
+                    type="text" 
+                    value={projectSpecs.baAssigned}
+                    onChange={(e) => updateSpecField('baAssigned', e.target.value)}
+                    className="bg-transparent text-right border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-brand-paramount dark:text-slate-200 w-32"
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">QA Assignee</span>
+                  <input 
+                    type="text" 
+                    value={projectSpecs.qaAssignee}
+                    onChange={(e) => updateSpecField('qaAssignee', e.target.value)}
+                    className="bg-transparent text-right border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-brand-paramount dark:text-slate-200 w-32"
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">DEV Assignee</span>
+                  <input 
+                    type="text" 
+                    value={projectSpecs.devAssignee}
+                    onChange={(e) => updateSpecField('devAssignee', e.target.value)}
+                    className="bg-transparent text-right border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-brand-paramount dark:text-slate-200 w-32"
+                  />
+                </div>
+              </div>
+
+              {/* Status & Progress Track */}
+              <div className="border-t border-slate-100 dark:border-slate-800/40 pt-3 space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">Project Status</span>
                   <select 
-                    value={tcStatus} onChange={(e) => setTcStatus(e.target.value as any)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white cursor-pointer"
+                    value={projectSpecs.status}
+                    onChange={(e) => updateSpecField('status', e.target.value)}
+                    className="bg-transparent dark:bg-neutral-cardDark font-black border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 text-emerald-500 text-[10px]"
                   >
-                    <option value="Passed">Passed</option>
-                    <option value="Failed">Failed</option>
-                    <option value="Untested">Untested</option>
-                    <option value="Blocked">Blocked</option>
+                    <option value="Active">Active</option>
+                    <option value="Completed">Completed</option>
+                    <option value="On Hold">On Hold</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Assigned QA</label>
-                  <input 
-                    type="text" required value={tcAssignee} onChange={(e) => setTcAssignee(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none"
-                  />
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">Progress Track</span>
+                  <div className="flex space-x-1">
+                    {['Todo', 'In Progress', 'Launched'].map((track) => (
+                      <button 
+                        key={track}
+                        onClick={() => updateSpecField('progress', track)}
+                        className={`px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-tight transition-all ${
+                          projectSpecs.progress === track
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 dark:bg-neutral-obsidian/60 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                        }`}
+                      >
+                        {track}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4 font-sans">
-                <button type="button" onClick={() => setIsTcModalOpen(false)} className="px-4 py-2.5 border rounded-lg text-xs font-bold hover:bg-slate-50">Cancel</button>
-                <button type="submit" className="px-4 py-2.5 bg-brand-accent text-white text-xs font-bold rounded-lg shadow hover:opacity-90">Save Changes</button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
 
+          {/* Scratchpad Notes */}
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+              Local Notes / Scratchpad
+            </h3>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Jot down quick reminders here..."
+              className="w-full p-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-neutral-cardDark/55 text-brand-paramount dark:text-white placeholder-slate-400 h-24 resize-none shadow-sm focus:outline-none"
+            />
+          </div>
+
+          {/* Audit Trail Logs */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
+              Document Audit Trail
+            </h3>
+            <div className="flex-1 bg-white dark:bg-neutral-cardDark/55 border border-slate-100 dark:border-slate-800/50 rounded-xl p-3 overflow-y-auto space-y-2.5 min-h-[120px] shadow-sm">
+              {auditLogs.map((log, idx) => (
+                <div key={idx} className="border-b border-slate-100 dark:border-slate-800/30 last:border-0 pb-2 last:pb-0 text-[10px]">
+                  <div className="flex justify-between font-bold text-slate-400 mb-0.5">
+                    <span>{log.user}</span>
+                    <span>{log.timestamp}</span>
+                  </div>
+                  <p className="text-brand-paramount dark:text-slate-300 font-semibold">{log.action}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+      </div>
     </div>
   );
 }
