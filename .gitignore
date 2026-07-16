@@ -1,0 +1,20 @@
+# Node dependencies & builds
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Python Virtual Environments (All levels)
+.venv/
+venv/
+**/venv/
+**/env/
+**/.venv/
+
+# Python caching files
+**/__pycache__/
+*.pyc
+
+# Environment & local OS files
+.env
+.DS_Store
+Thumbs.db
