@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Login from './pages/login';
 import UserPortal from './pages/userportal';
 import Projects from './pages/projects';
@@ -12,6 +12,40 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'login' | 'projects' | 'users' | 'documentation'>('login');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
+  // --- Real-time Date and Time State ---
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Logged-in user information (Defaults to Arra)
+  const [currentUser] = useState({
+    firstName: "Arra",
+    lastName: "Del Mundo",
+  });
+
+  // Updates the clock every single second
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isLoggedIn]);
+
+  // Clock Formatting Helpers
+  const formattedDate = currentTime.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  const formattedTime = currentTime.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
   };
@@ -22,9 +56,11 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    setActiveProjectId(null);
-    setCurrentView('login');
+    if (confirm("Are you sure you want to log out?")) {
+      setIsLoggedIn(false);
+      setActiveProjectId(null);
+      setCurrentView('login');
+    }
   };
 
   const handleOpenProject = (projectId: string) => {
@@ -46,8 +82,8 @@ export default function App() {
           <span className="text-xs text-slate-400">/ Workspace</span>
         </div>
 
-        {/* Global Controls */}
-        <div className="flex items-center space-x-3">
+        {/* Global Controls & Dynamic User Widget */}
+        <div className="flex items-center space-x-4">
           {isLoggedIn && (
             <>
               <button 
@@ -79,16 +115,31 @@ export default function App() {
             onClick={toggleTheme}
             className="flex items-center space-x-1.5 px-3 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
           >
-            <span>{isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}</span>
+            <span>{isDarkMode ? '☀️ Light' : '🌙 Dark'}</span>
           </button>
 
+          {/* 👤 NESTED USER METADATA & LOGOUT PANEL */}
           {isLoggedIn && (
-            <button 
-              onClick={handleLogout}
-              className="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
-            >
-              Logout
-            </button>
+            <div className="flex items-center pl-4 border-l border-slate-100 dark:border-slate-800 space-x-3">
+              
+              {/* User Identity & Live Ticking Clock */}
+              <div className="text-right flex flex-col justify-center">
+                <span className="text-sm font-extrabold tracking-tight text-brand-paramount dark:text-white">
+                  Hi, {currentUser.firstName}!
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 tracking-wide uppercase mt-0.5">
+                  {formattedDate} • {formattedTime}
+                </span>
+              </div>
+
+              {/* Contained Logout Button */}
+              <button 
+                onClick={handleLogout}
+                className="px-3 py-1.5 rounded-lg border border-red-500/20 hover:border-red-500/50 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all duration-200"
+              >
+                Logout
+              </button>
+            </div>
           )}
         </div>
       </div>

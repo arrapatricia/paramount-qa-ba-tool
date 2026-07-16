@@ -1,19 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { userAPI, roleAPI } from '../services/api';
 
 interface Role {
-  id: string;
+  id: number;
   name: string;
-  canCreateProject: boolean;
-  canEditAllProjects: boolean;
+  can_create_project: boolean;
+  can_edit_all_projects: boolean;
 }
 
 interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
+  id: number;
+  first_name: string;
+  last_name: string;
   email: string;
-  role: string;
-  isActive: boolean;
+  role_name: string;
+  is_active: boolean;
 }
 
 interface AdminLog {
@@ -29,14 +30,34 @@ interface UserPortalProps {
 }
 
 export default function UserPortal({ isDarkMode }: UserPortalProps) {
-  // --- Audit Logs State ---
+  // --- Core State synced with backend database ---
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // --- User Form Input States ---
+  const [usrFirstName, setUsrFirstName] = useState('');
+  const [usrLastName, setUsrLastName] = useState('');
+  const [usrEmail, setUsrEmail] = useState('');
+  const [usrRole, setUsrRole] = useState('Admin');
+  const [usrPassword, setUsrPassword] = useState('');
+
+  // --- Password Reset States ---
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetUserId, setResetUserId] = useState<number | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+
+  // --- Navigation Section State ---
+  const [adminSection, setAdminSection] = useState<'users' | 'roles' | 'logs'>('users');
+
+  // --- Audit Logs ---
   const [logs, setLogs] = useState<AdminLog[]>([
     {
       id: 'log-1',
       timestamp: 'July 16, 2026 at 09:12 AM',
       category: 'User',
       action: 'INITIALIZED',
-      details: 'System Admin account generated.'
+      details: 'System database linked.'
     }
   ]);
 
@@ -62,13 +83,28 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
     setLogs(prev => [newLog, ...prev]);
   };
 
-  // --- Roles State ---
-  const [roles, setRoles] = useState<Role[]>([
-    { id: 'role-1', name: 'Admin', canCreateProject: true, canEditAllProjects: true },
-    { id: 'role-2', name: 'Business Analyst', canCreateProject: true, canEditAllProjects: false },
-    { id: 'role-3', name: 'QA Engineer', canCreateProject: false, canEditAllProjects: false },
-  ]);
+  // --- Initialize & Load Data from SQLite ---
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setIsLoading(true);
+        const fetchedRoles = await roleAPI.getAll();
+        const fetchedUsers = await userAPI.getAll();
+        setRoles(fetchedRoles);
+        setUsers(fetchedUsers);
+        if (fetchedRoles.length > 0) {
+          setUsrRole(fetchedRoles[0].name);
+        }
+      } catch (err) {
+        console.error("Failed to load backend tables:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
+  // --- Role Modal states ---
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   
@@ -76,97 +112,104 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
   const [roleCanCreate, setRoleCanCreate] = useState(false);
   const [roleCanEditAll, setRoleCanEditAll] = useState(false);
 
-  // --- Users State ---
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: 'usr-1',
-      firstName: 'Admin',
-      lastName: 'User',
-      email: 'admin@company.com',
-      role: 'Admin',
-      isActive: true,
-    },
-  ]);
-
+  // --- User Modal states ---
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  
-  const [usrFirstName, setUsrFirstName] = useState('');
-  const [usrLastName, setUsrLastName] = useState('');
-  const [usrEmail, setUsrEmail] = useState('');
-  const [usrRole, setUsrRole] = useState('Admin');
 
-  const [adminSection, setAdminSection] = useState<'users' | 'roles' | 'logs'>('users');
-
-  // --- User Operations (Create & Edit & Delete) ---
+  // --- User Operations (Create, Edit & Delete) ---
   const handleOpenCreateUser = () => {
     setEditingUser(null);
     setUsrFirstName('');
     setUsrLastName('');
     setUsrEmail('');
-    setUsrRole('Admin');
+    setUsrPassword(''); // Clear password input
+    if (roles.length > 0) setUsrRole(roles[0].name);
     setIsUserModalOpen(true);
   };
 
   const handleOpenEditUser = (user: User) => {
     setEditingUser(user);
-    setUsrFirstName(user.firstName);
-    setUsrLastName(user.lastName);
+    setUsrFirstName(user.first_name);
+    setUsrLastName(user.last_name);
     setUsrEmail(user.email);
-    setUsrRole(user.role);
+    setUsrRole(user.role_name);
     setIsUserModalOpen(true);
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingUser) {
-      // Edit
-      setUsers(users.map(u => u.id === editingUser.id ? {
-        ...u,
-        firstName: usrFirstName,
-        lastName: usrLastName,
-        email: usrEmail,
-        role: usrRole
-      } : u));
-      
-      addLog('User', 'UPDATED', `User profile updated: ${usrFirstName} ${usrLastName} (${usrEmail}) assigned as ${usrRole}.`);
-    } else {
-      // Create
-      const newUser: User = {
-        id: `usr-${Date.now()}`,
-        firstName: usrFirstName,
-        lastName: usrLastName,
-        email: usrEmail,
-        role: usrRole,
-        isActive: true,
-      };
-      setUsers([...users, newUser]);
-      
-      addLog('User', 'CREATED', `New account generated: ${usrFirstName} ${usrLastName} assigned role ${usrRole}.`);
-    }
-    setIsUserModalOpen(false);
-  };
-
-  const toggleUserStatus = (id: string) => {
-    const targetUser = users.find(u => u.id === id);
-    if (targetUser) {
-      const nextState = !targetUser.isActive;
-      setUsers(users.map(u => u.id === id ? { ...u, isActive: nextState } : u));
-      addLog('User', 'STATUS CHANGE', `Toggled ${targetUser.firstName} ${targetUser.lastName} account status to ${nextState ? 'ACTIVE' : 'INACTIVE'}.`);
+    try {
+      if (editingUser) {
+        // Live PUT (Does not require password change)
+        const updated = await userAPI.update(editingUser.id, {
+          first_name: usrFirstName,
+          last_name: usrLastName,
+          email: usrEmail,
+          is_active: editingUser.is_active,
+          role_name: usrRole,
+        });
+        setUsers(users.map(u => (u.id === editingUser.id ? updated : u)));
+        addLog('User', 'UPDATED', `User profile altered: ${usrFirstName} ${usrLastName} assigned as ${usrRole}.`);
+      } else {
+        // Live POST (Includes secure password hashing payload)
+        const created = await userAPI.create({
+          first_name: usrFirstName,
+          last_name: usrLastName,
+          email: usrEmail,
+          password: usrPassword,
+          is_active: true,
+          role_name: usrRole,
+        });
+        setUsers([...users, created]);
+        addLog('User', 'CREATED', `New account generated: ${usrFirstName} ${usrLastName} assigned role ${usrRole}.`);
+      }
+      setIsUserModalOpen(false);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "An error occurred while saving user details.");
     }
   };
 
-  const handleDeleteUser = (id: string) => {
+  const toggleUserStatus = async (id: number) => {
+    try {
+      const updated = await userAPI.toggleStatus(id);
+      setUsers(users.map(u => (u.id === id ? updated : u)));
+      addLog('User', 'STATUS CHANGE', `Toggled ${updated.first_name} ${updated.last_name} account status to ${updated.is_active ? 'ACTIVE' : 'INACTIVE'}.`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
     const targetUser = users.find(u => u.id === id);
     if (targetUser) {
-      if (confirm(`Are you sure you want to delete user ${targetUser.firstName}?`)) {
-        setUsers(users.filter(u => u.id !== id));
-        addLog('User', 'DELETED', `Permanently deleted system user: ${targetUser.firstName} ${targetUser.lastName} (${targetUser.email}).`);
+      if (confirm(`Are you sure you want to delete user ${targetUser.first_name}?`)) {
+        try {
+          await userAPI.delete(id);
+          setUsers(users.filter(u => u.id !== id));
+          addLog('User', 'DELETED', `Permanently deleted user: ${targetUser.first_name} ${targetUser.last_name}.`);
+        } catch (err) {
+          console.error(err);
+        }
       }
     }
   };
 
-  // --- Role Operations (Create & Edit & Delete) ---
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resetUserId === null) return;
+    try {
+      await userAPI.resetPassword(resetUserId, { new_password: newPassword });
+      const targetUser = users.find(u => u.id === resetUserId);
+      addLog('User', 'PASSWORD RESET', `Password securely updated for user: ${targetUser?.first_name} ${targetUser?.last_name}.`);
+      setIsResetModalOpen(false);
+      setNewPassword('');
+      alert("Password updated successfully!");
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Failed to reset password.");
+    }
+  };
+
+  // --- Role Operations (Create, Edit & Delete) ---
   const handleOpenCreateRole = () => {
     setEditingRole(null);
     setRoleName('');
@@ -178,51 +221,68 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
   const handleOpenEditRole = (role: Role) => {
     setEditingRole(role);
     setRoleName(role.name);
-    setRoleCanCreate(role.canCreateProject);
-    setRoleCanEditAll(role.canEditAllProjects);
+    setRoleCanCreate(role.can_create_project);
+    setRoleCanEditAll(role.can_edit_all_projects);
     setIsRoleModalOpen(true);
   };
 
-  const handleSaveRole = (e: React.FormEvent) => {
+  const handleSaveRole = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingRole) {
-      // Edit
-      setRoles(roles.map(r => r.id === editingRole.id ? {
-        ...r,
-        name: roleName,
-        canCreateProject: roleCanCreate,
-        canEditAllProjects: roleCanEditAll,
-      } : r));
-      
-      addLog('Role', 'UPDATED', `Permissions updated on custom role: "${roleName}".`);
-    } else {
-      // Create
-      const newRole: Role = {
-        id: `role-${Date.now()}`,
-        name: roleName,
-        canCreateProject: roleCanCreate,
-        canEditAllProjects: roleCanEditAll,
-      };
-      setRoles([...roles, newRole]);
-      
-      addLog('Role', 'CREATED', `Custom system security role configured: "${roleName}".`);
+    try {
+      if (editingRole) {
+        // Live PUT
+        const updated = await roleAPI.update(editingRole.id, {
+          name: roleName,
+          can_create_project: roleCanCreate,
+          can_edit_all_projects: roleCanEditAll,
+        });
+        setRoles(roles.map(r => (r.id === editingRole.id ? updated : r)));
+        addLog('Role', 'UPDATED', `Permissions updated on custom role: "${roleName}".`);
+      } else {
+        // Live POST
+        const created = await roleAPI.create({
+          name: roleName,
+          can_create_project: roleCanCreate,
+          can_edit_all_projects: roleCanEditAll,
+        });
+        setRoles([...roles, created]);
+        addLog('Role', 'CREATED', `Custom system security role configured: "${roleName}".`);
+      }
+      setIsRoleModalOpen(false);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "An error occurred while saving the role.");
     }
-    setIsRoleModalOpen(false);
   };
 
-  const handleDeleteRole = (id: string) => {
+  const handleDeleteRole = async (id: number) => {
     const roleToDelete = roles.find(r => r.id === id);
     if (roleToDelete) {
-      if (roleToDelete.name === 'Admin' || roleToDelete.name === 'Business Analyst' || roleToDelete.name === 'QA Engineer') {
+      if (['Admin', 'Business Analyst', 'QA Engineer'].includes(roleToDelete.name)) {
         alert("System default permissions cannot be customized or deleted!");
         return;
       }
       if (confirm(`Delete the custom role "${roleToDelete.name}"?`)) {
-        setRoles(roles.filter(r => r.id !== id));
-        addLog('Role', 'DELETED', `Custom system role removed: "${roleToDelete.name}".`);
+        try {
+          await roleAPI.delete(id);
+          setRoles(roles.filter(r => r.id !== id));
+          addLog('Role', 'DELETED', `Custom system role removed: "${roleToDelete.name}".`);
+        } catch (err: any) {
+          alert(err.response?.data?.detail || "Failed to delete role.");
+        }
       }
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-neutral-obsidian text-white">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-brand-accent border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm font-semibold tracking-wider text-slate-400">CONNECTING TO DATABASE...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`p-8 min-h-screen font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-brand-lightBg text-brand-paramount'} transition-colors duration-300`}>
@@ -232,7 +292,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight">User Administration</h1>
-            <p className="text-sm text-neutral-darkGray mt-1">Manage platform access, track security records, and assign user permissions.</p>
+            <p className="text-sm text-neutral-darkGray mt-1">Manage platform access, track security records, and assign user permissions directly from the database.</p>
           </div>
           
           <div className="flex gap-2 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-800">
@@ -306,19 +366,19 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                   {users.map(u => (
                     <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors">
                       <td className="p-6">
-                        <div className="font-bold text-brand-paramount dark:text-white">{u.firstName} {u.lastName}</div>
+                        <div className="font-bold text-brand-paramount dark:text-white">{u.first_name} {u.last_name}</div>
                         <div className="text-xs text-slate-400 font-medium">{u.email}</div>
                       </td>
                       <td className="p-6">
                         <span className="px-2.5 py-1 rounded-md text-xs font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-300">
-                          {u.role}
+                          {u.role_name}
                         </span>
                       </td>
                       <td className="p-6">
                         <div className="flex items-center space-x-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <span className={`w-2.5 h-2.5 rounded-full ${u.is_active ? 'bg-green-500' : 'bg-red-500'}`} />
                           <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                            {u.isActive ? 'Active' : 'Inactive'}
+                            {u.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </div>
                       </td>
@@ -331,18 +391,28 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                             <button
                               onClick={() => toggleUserStatus(u.id)}
                               className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none ${
-                                u.isActive ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-800'
+                                u.is_active ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-800'
                               }`}
                             >
                               <div
                                 className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                                  u.isActive ? 'translate-x-6' : 'translate-x-0'
+                                  u.is_active ? 'translate-x-6' : 'translate-x-0'
                                 }`}
                               />
                             </button>
                           </div>
 
                           <div className="flex items-center space-x-3 border-l border-slate-100 dark:border-slate-800 pl-4">
+                            {/* PW Reset Action Link */}
+                            <button
+                              onClick={() => {
+                                setResetUserId(u.id);
+                                setIsResetModalOpen(true);
+                              }}
+                              className="text-xs font-bold text-slate-400 dark:text-slate-500 hover:text-brand-accent uppercase tracking-widest hover:underline"
+                            >
+                              Reset PW
+                            </button>
                             <button
                               onClick={() => handleOpenEditUser(u)}
                               className="text-xs font-bold text-brand-accent uppercase tracking-widest hover:underline"
@@ -397,16 +467,16 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                       </td>
                       <td className="p-6">
                         <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                          r.canCreateProject ? 'bg-green-100 dark:bg-green-950/30 text-green-700' : 'bg-red-100 dark:bg-red-950/30 text-red-600'
+                          r.can_create_project ? 'bg-green-100 dark:bg-green-950/30 text-green-700' : 'bg-red-100 dark:bg-red-950/30 text-red-600'
                         }`}>
-                          {r.canCreateProject ? 'Allowed' : 'Disabled'}
+                          {r.can_create_project ? 'Allowed' : 'Disabled'}
                         </span>
                       </td>
                       <td className="p-6">
                         <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                          r.canEditAllProjects ? 'bg-green-100 dark:bg-green-950/30 text-green-700' : 'bg-orange-100 dark:bg-orange-950/30 text-orange-600'
+                          r.can_edit_all_projects ? 'bg-green-100 dark:bg-green-950/30 text-green-700' : 'bg-orange-100 dark:bg-orange-950/30 text-orange-600'
                         }`}>
-                          {r.canEditAllProjects ? 'All Projects' : 'Own Created Only (Others View-Only)'}
+                          {r.can_edit_all_projects ? 'All Projects' : 'Own Created Only (Others View-Only)'}
                         </span>
                       </td>
                       <td className="p-6 text-right">
@@ -433,7 +503,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
           </div>
         )}
 
-        {/* --- Tab 3: Security & Activity Logs Ledger --- */}
+        {/* --- Tab 3: Security Logs --- */}
         {adminSection === 'logs' && (
           <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800/50">
@@ -478,7 +548,6 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                   <input
                     type="text" required value={usrFirstName} onChange={(e) => setUsrFirstName(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
-                    placeholder="John"
                   />
                 </div>
                 <div>
@@ -486,7 +555,6 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                   <input
                     type="text" required value={usrLastName} onChange={(e) => setUsrLastName(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
-                    placeholder="Doe"
                   />
                 </div>
               </div>
@@ -496,9 +564,20 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 <input
                   type="email" required value={usrEmail} onChange={(e) => setUsrEmail(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
-                  placeholder="name@company.com"
                 />
               </div>
+
+              {/* Password field - only rendered for brand new registrations */}
+              {!editingUser && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Login Password</label>
+                  <input
+                    type="password" required value={usrPassword} onChange={(e) => setUsrPassword(e.target.value)}
+                    placeholder="Choose a secure password"
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Assign Security Role</label>
@@ -545,7 +624,6 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 <input
                   type="text" required value={roleName} onChange={(e) => setRoleName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
-                  placeholder="e.g., Senior BA"
                 />
               </div>
 
@@ -607,6 +685,42 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                   className="px-4 py-2.5 bg-brand-accent text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow hover:opacity-90 transition-all"
                 >
                   Save Role
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 3: SECURE PASSWORD RESET --- */}
+      {isResetModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-sm bg-white dark:bg-neutral-cardDark rounded-2xl p-8 shadow-2xl border border-slate-100 dark:border-neutral-800">
+            <h3 className="text-xl font-bold text-brand-paramount dark:text-white mb-2">Reset Password</h3>
+            <p className="text-xs text-slate-400 mb-6">Assign a secure new password for this user's account.</p>
+            
+            <form onSubmit={handleResetPassword} className="space-y-4 text-sm">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">New Password</label>
+                <input
+                  type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter secure password"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <button
+                  type="button" onClick={() => { setIsResetModalOpen(false); setNewPassword(''); }}
+                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 bg-brand-accent text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow hover:opacity-90 transition-all"
+                >
+                  Confirm Reset
                 </button>
               </div>
             </form>
