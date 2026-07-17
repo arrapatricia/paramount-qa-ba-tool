@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react';
 import { userAPI, roleAPI } from '../services/api';
 
+// 1. Updated Interface matching new Database Schema
 interface Role {
   id: number;
   name: string;
-  can_create_project: boolean;
-  can_edit_all_projects: boolean;
+  is_active: boolean;
+  // Project Permissions
+  project_create: boolean;
+  project_read: boolean;
+  project_update: boolean;
+  project_delete: boolean;
+  // QA Test Suite Permissions
+  qa_suite_create: boolean;
+  qa_suite_read: boolean;
+  qa_suite_update: boolean;
+  qa_suite_delete: boolean;
 }
 
 interface User {
@@ -83,7 +93,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
     setLogs(prev => [newLog, ...prev]);
   };
 
-  // --- Initialize & Load Data from SQLite ---
+  // --- Initialize & Load Data ---
   useEffect(() => {
     async function loadData() {
       try {
@@ -109,20 +119,31 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   
   const [roleName, setRoleName] = useState('');
-  const [roleCanCreate, setRoleCanCreate] = useState(false);
-  const [roleCanEditAll, setRoleCanEditAll] = useState(false);
+  const [roleIsActive, setRoleIsActive] = useState(true);
+  
+  // Project CRUD States
+  const [pCreate, setPCreate] = useState(false);
+  const [pRead, setPRead] = useState(false);
+  const [pUpdate, setPUpdate] = useState(false);
+  const [pDelete, setPDelete] = useState(false);
+
+  // QA CRUD States
+  const [qCreate, setQCreate] = useState(false);
+  const [qRead, setQRead] = useState(false);
+  const [qUpdate, setQUpdate] = useState(false);
+  const [qDelete, setQDelete] = useState(false);
 
   // --- User Modal states ---
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  // --- User Operations (Create, Edit & Delete) ---
+  // --- User Operations ---
   const handleOpenCreateUser = () => {
     setEditingUser(null);
     setUsrFirstName('');
     setUsrLastName('');
     setUsrEmail('');
-    setUsrPassword(''); // Clear password input
+    setUsrPassword('');
     if (roles.length > 0) setUsrRole(roles[0].name);
     setIsUserModalOpen(true);
   };
@@ -140,7 +161,6 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
     e.preventDefault();
     try {
       if (editingUser) {
-        // Live PUT (Does not require password change)
         const updated = await userAPI.update(editingUser.id, {
           first_name: usrFirstName,
           last_name: usrLastName,
@@ -151,7 +171,6 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
         setUsers(users.map(u => (u.id === editingUser.id ? updated : u)));
         addLog('User', 'UPDATED', `User profile altered: ${usrFirstName} ${usrLastName} assigned as ${usrRole}.`);
       } else {
-        // Live POST (Includes secure password hashing payload)
         const created = await userAPI.create({
           first_name: usrFirstName,
           last_name: usrLastName,
@@ -209,42 +228,56 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
     }
   };
 
-  // --- Role Operations (Create, Edit & Delete) ---
+  // --- Role Operations (Expanded for CRUD & Status Toggles) ---
   const handleOpenCreateRole = () => {
     setEditingRole(null);
     setRoleName('');
-    setRoleCanCreate(false);
-    setRoleCanEditAll(false);
+    setRoleIsActive(true);
+    setPCreate(false); setPRead(false); setPUpdate(false); setPDelete(false);
+    setQCreate(false); setQRead(false); setQUpdate(false); setQDelete(false);
     setIsRoleModalOpen(true);
   };
 
   const handleOpenEditRole = (role: Role) => {
     setEditingRole(role);
     setRoleName(role.name);
-    setRoleCanCreate(role.can_create_project);
-    setRoleCanEditAll(role.can_edit_all_projects);
+    setRoleIsActive(role.is_active);
+    
+    setPCreate(role.project_create);
+    setPRead(role.project_read);
+    setPUpdate(role.project_update);
+    setPDelete(role.project_delete);
+    
+    setQCreate(role.qa_suite_create);
+    setQRead(role.qa_suite_read);
+    setQUpdate(role.qa_suite_update);
+    setQDelete(role.qa_suite_delete);
+    
     setIsRoleModalOpen(true);
   };
 
   const handleSaveRole = async (e: React.FormEvent) => {
     e.preventDefault();
+    const roleData = {
+      name: roleName,
+      is_active: roleIsActive,
+      project_create: pCreate,
+      project_read: pRead,
+      project_update: pUpdate,
+      project_delete: pDelete,
+      qa_suite_create: qCreate,
+      qa_suite_read: qRead,
+      qa_suite_update: qUpdate,
+      qa_suite_delete: qDelete
+    };
+
     try {
       if (editingRole) {
-        // Live PUT
-        const updated = await roleAPI.update(editingRole.id, {
-          name: roleName,
-          can_create_project: roleCanCreate,
-          can_edit_all_projects: roleCanEditAll,
-        });
+        const updated = await roleAPI.update(editingRole.id, roleData);
         setRoles(roles.map(r => (r.id === editingRole.id ? updated : r)));
         addLog('Role', 'UPDATED', `Permissions updated on custom role: "${roleName}".`);
       } else {
-        // Live POST
-        const created = await roleAPI.create({
-          name: roleName,
-          can_create_project: roleCanCreate,
-          can_edit_all_projects: roleCanEditAll,
-        });
+        const created = await roleAPI.create(roleData);
         setRoles([...roles, created]);
         addLog('Role', 'CREATED', `Custom system security role configured: "${roleName}".`);
       }
@@ -385,7 +418,6 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                       <td className="p-6 text-right">
                         <div className="flex items-center justify-end space-x-6">
                           
-                          {/* Circle Toggle Switch */}
                           <div className="flex items-center space-x-2">
                             <span className="text-[10px] font-bold text-slate-400 uppercase">Status</span>
                             <button
@@ -403,7 +435,6 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                           </div>
 
                           <div className="flex items-center space-x-3 border-l border-slate-100 dark:border-slate-800 pl-4">
-                            {/* PW Reset Action Link */}
                             <button
                               onClick={() => {
                                 setResetUserId(u.id);
@@ -436,7 +467,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
           </div>
         )}
 
-        {/* --- Tab 2: Role Directory --- */}
+        {/* --- Tab 2: Role Directory (CRUD Columns View) --- */}
         {adminSection === 'roles' && (
           <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800/50 flex justify-between items-center">
@@ -454,8 +485,9 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800/50 text-[10px] uppercase tracking-widest text-slate-400 font-bold">
                     <th className="p-6">Role Name</th>
-                    <th className="p-6">Create Projects</th>
-                    <th className="p-6">Edit Scope Permission</th>
+                    <th className="p-6">Status</th>
+                    <th className="p-6">Project Matrix (CRUD)</th>
+                    <th className="p-6">QA Suite Matrix (CRUD)</th>
                     <th className="p-6 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -466,18 +498,27 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                         <span className="font-bold text-brand-paramount dark:text-white text-base">{r.name}</span>
                       </td>
                       <td className="p-6">
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                          r.can_create_project ? 'bg-green-100 dark:bg-green-950/30 text-green-700' : 'bg-red-100 dark:bg-red-950/30 text-red-600'
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                          r.is_active ? 'bg-green-100 dark:bg-green-950/30 text-green-700' : 'bg-red-100 dark:bg-red-950/30 text-red-600'
                         }`}>
-                          {r.can_create_project ? 'Allowed' : 'Disabled'}
+                          {r.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="p-6">
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                          r.can_edit_all_projects ? 'bg-green-100 dark:bg-green-950/30 text-green-700' : 'bg-orange-100 dark:bg-orange-950/30 text-orange-600'
-                        }`}>
-                          {r.can_edit_all_projects ? 'All Projects' : 'Own Created Only (Others View-Only)'}
-                        </span>
+                        <div className="flex gap-1 text-[11px] font-mono">
+                          <span className={r.project_create ? "text-green-500 font-bold" : "text-slate-300 dark:text-slate-700"}>C</span>
+                          <span className={r.project_read ? "text-blue-500 font-bold" : "text-slate-300 dark:text-slate-700"}>R</span>
+                          <span className={r.project_update ? "text-orange-500 font-bold" : "text-slate-300 dark:text-slate-700"}>U</span>
+                          <span className={r.project_delete ? "text-red-500 font-bold" : "text-slate-300 dark:text-slate-700"}>D</span>
+                        </div>
+                      </td>
+                      <td className="p-6">
+                        <div className="flex gap-1 text-[11px] font-mono">
+                          <span className={r.qa_suite_create ? "text-green-500 font-bold" : "text-slate-300 dark:text-slate-700"}>C</span>
+                          <span className={r.qa_suite_read ? "text-blue-500 font-bold" : "text-slate-300 dark:text-slate-700"}>R</span>
+                          <span className={r.qa_suite_update ? "text-orange-500 font-bold" : "text-slate-300 dark:text-slate-700"}>U</span>
+                          <span className={r.qa_suite_delete ? "text-red-500 font-bold" : "text-slate-300 dark:text-slate-700"}>D</span>
+                        </div>
                       </td>
                       <td className="p-6 text-right">
                         <div className="flex items-center justify-end space-x-4">
@@ -567,7 +608,6 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 />
               </div>
 
-              {/* Password field - only rendered for brand new registrations */}
               {!editingUser && (
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Login Password</label>
@@ -610,13 +650,34 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
         </div>
       )}
 
-      {/* --- MODAL 2: CREATE/EDIT ROLE (CRUD) --- */}
+      {/* --- MODAL 2: CREATE/EDIT ROLE WITH DYNAMIC FEATURE-BY-FEATURE CRUD MATRIX --- */}
       {isRoleModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-8 shadow-2xl border border-slate-100 dark:border-neutral-800">
-            <h3 className="text-xl font-bold text-brand-paramount dark:text-white mb-6">
-              {editingRole ? `Modify Role: ${editingRole.name}` : 'Create Custom Security Role'}
-            </h3>
+          <div className="w-full max-w-xl bg-white dark:bg-neutral-cardDark rounded-2xl p-8 shadow-2xl border border-slate-100 dark:border-neutral-800">
+            
+            {/* Modal Header containing Global Active Toggle */}
+            <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100 dark:border-slate-800/50">
+              <h3 className="text-xl font-bold text-brand-paramount dark:text-white">
+                {editingRole ? `Modify Role: ${editingRole.name}` : 'Create Custom Security Role'}
+              </h3>
+              
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-slate-400 uppercase">Role Status</span>
+                <button
+                  type="button"
+                  onClick={() => setRoleIsActive(!roleIsActive)}
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none ${
+                    roleIsActive ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-800'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                      roleIsActive ? 'translate-x-6' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
             
             <form onSubmit={handleSaveRole} className="space-y-6 text-sm">
               <div>
@@ -627,49 +688,58 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 />
               </div>
 
-              <div className="space-y-4 border-t border-slate-100 dark:border-slate-800/80 pt-4">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Access Permissions</p>
+              {/* Matrix Layout Container */}
+              <div className="space-y-6 border-t border-slate-100 dark:border-slate-800/80 pt-4">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Feature Access Matrix Permissions</p>
                 
-                {/* Switch Permission A */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-brand-paramount dark:text-slate-200 block">Create Page & Projects</span>
-                    <span className="text-xs text-slate-400">Allows creation of new projects & new sub-pages inside projects.</span>
+                {/* 1. New Project Access Group */}
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 space-y-3">
+                  <div className="font-extrabold text-brand-paramount dark:text-white text-sm flex items-center gap-1.5">
+                    📂 Projects Management Feature
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setRoleCanCreate(!roleCanCreate)}
-                    className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none ${
-                      roleCanCreate ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-800'
-                    }`}
-                  >
-                    <div
-                      className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                        roleCanCreate ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
+                    <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={pCreate} onChange={(e) => setPCreate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Create</span>
+                    </label>
+                    <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={pRead} onChange={(e) => setPRead(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Read</span>
+                    </label>
+                    <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={pUpdate} onChange={(e) => setPUpdate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Update</span>
+                    </label>
+                    <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={pDelete} onChange={(e) => setPDelete(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Delete</span>
+                    </label>
+                  </div>
                 </div>
 
-                {/* Switch Permission B */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-brand-paramount dark:text-slate-200 block">Edit All Projects</span>
-                    <span className="text-xs text-slate-400">Unrestricted edit. If OFF, user edits only their created projects.</span>
+                {/* 2. New QA Test Suite Access Group */}
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 space-y-3">
+                  <div className="font-extrabold text-brand-paramount dark:text-white text-sm flex items-center gap-1.5">
+                    🧪 QA Test Suites Feature
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setRoleCanEditAll(!roleCanEditAll)}
-                    className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none ${
-                      roleCanEditAll ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-800'
-                    }`}
-                  >
-                    <div
-                      className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                        roleCanEditAll ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
+                    <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={qCreate} onChange={(e) => setQCreate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Create</span>
+                    </label>
+                    <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={qRead} onChange={(e) => setQRead(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Read</span>
+                    </label>
+                    <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={qUpdate} onChange={(e) => setQUpdate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Update</span>
+                    </label>
+                    <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={qDelete} onChange={(e) => setQDelete(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Delete</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 

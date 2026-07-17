@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create a configured Axios instance pointing to your FastAPI local port
 const API = axios.create({
-  baseURL: 'http://127.0.0.1:8000',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://paramount-qa-ba-tool-production.up.railway.app',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,16 +11,31 @@ const API = axios.create({
 // ==========================================
 // 🔑 ROLE API CALLS
 // ==========================================
+export interface RoleData {
+  name: string;
+  is_active: boolean;
+  // Project Permissions
+  project_create: boolean;
+  project_read: boolean;
+  project_update: boolean;
+  project_delete: boolean;
+  // QA Test Suite Permissions
+  qa_suite_create: boolean;
+  qa_suite_read: boolean;
+  qa_suite_update: boolean;
+  qa_suite_delete: boolean;
+}
+
 export const roleAPI = {
   getAll: async () => {
     const res = await API.get('/roles');
     return res.data;
   },
-  create: async (data: { name: string; can_create_project: boolean; can_edit_all_projects: boolean }) => {
+  create: async (data: RoleData) => {
     const res = await API.post('/roles', data);
     return res.data;
   },
-  update: async (id: number, data: { name: string; can_create_project: boolean; can_edit_all_projects: boolean }) => {
+  update: async (id: number, data: RoleData) => {
     const res = await API.put(`/roles/${id}`, data);
     return res.data;
   },
@@ -63,9 +78,6 @@ export const userAPI = {
   },
 };
 
-// ==========================================
-// 💬 PERSISTENT NOTES API CALLS
-// ==========================================
 export const noteAPI = {
   getAll: async () => {
     const res = await API.get('/notes');
