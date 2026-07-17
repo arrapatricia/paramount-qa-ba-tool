@@ -17,9 +17,15 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
 # 2. Configure CORS so your React frontend can reach the backend
+origins = [
+    "https://frontend-sigma-topaz-54.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with your exact frontend URL
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
