@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 from passlib.context import CryptContext
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 # Set up our secure password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -16,29 +18,22 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
-# 2. Configure CORS with explicit domains and dynamic wildcards
-# origins = [
-#     "https://frontend-sigma-topaz-54.vercel.app",
-#     "https://frontend-sigma-topaz-54.vercel.app/",
-#     "http://localhost:5173",
-#     "http://127.0.0.1:5173",
-# ]
+# 2. Configure Dynamic CORS to completely bypass preflight checks with credentials
+class DynamicCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if request.method == "OPTIONS":
+            response = Response(status_code=204)
+        else:
+            response = await call_next(request)
+            
+        origin = request.headers.get("origin", "*")
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
+        return response
 
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=origins,
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,  # Set to False when using allow_origins=["*"] to comply with browser specifications
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(DynamicCORSMiddleware)
 
 # 3. Startup Event: Pre-populate standard roles with new feature CRUD matrix
 @app.on_event("startup")
@@ -92,7 +87,6 @@ def get_roles(db: Session = Depends(get_db)):
 
 @app.post("/roles", response_model=schemas.Role, status_code=status.HTTP_201_CREATED)
 def create_role(role: schemas.RoleCreate, db: Session = Depends(get_db)):
-    # Check if role name already exists
     existing = db.query(models.Role).filter(models.Role.name == role.name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Role name already exists")
@@ -113,19 +107,6 @@ def create_role(role: schemas.RoleCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_role)
     return new_role
-
-# @app.put("/roles/{role_id}", response_model=schemas.Role)
-# def update_role(role_id: int, updated_role: schemas.RoleCreate, db: Session = Depends(get_db)):
-#     role = db.query(models.Role).filter(models.Role.id == role_id).first()
-#     if not role:
-#         raise HTTPException(status_code=404, detail="Role not found")
-    
-#     role.name = updated_role.name
-#     role.can_create_project = updated_role.can_create_project
-#     role.can_edit_all_projects = updated_role.can_edit_all_projects
-#     db.commit()
-#     db.refresh(role)
-#     return role
 
 @app.put("/roles/{role_id}", response_model=schemas.Role)
 def update_role(role_id: int, updated_role: schemas.RoleCreate, db: Session = Depends(get_db)):
@@ -162,7 +143,6 @@ def delete_role(role_id: int, db: Session = Depends(get_db)):
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
     
-    # Block deleting system roles to prevent breaking defaults
     if role.name in ["Admin", "Business Analyst", "QA Engineer"]:
         raise HTTPException(status_code=400, detail="System Default roles cannot be deleted!")
         
@@ -170,10 +150,6 @@ def delete_role(role_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": f"Successfully deleted role: {role.name}"}
 
-
-# =====================================================================
-# 👤 USER ENDPOINTS (CRUD)
-# =====================================================================
 
 # =====================================================================
 # 👤 USER ENDPOINTS (CRUD & Security)
@@ -185,23 +161,19 @@ def get_users(db: Session = Depends(get_db)):
 
 @app.post("/users", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # Verify email is unique
     existing = db.query(models.User).filter(models.User.email == user.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Try to find corresponding role ID
     role = db.query(models.Role).filter(models.Role.name == user.role_name).first()
     role_id = role.id if role else None
-
-    # Secure the password using the pwd_context hash!
     hashed_pwd = pwd_context.hash(user.password)
 
     new_user = models.User(
         first_name=user.first_name,
         last_name=user.last_name,
         email=user.email,
-        hashed_password=hashed_pwd,  # Save the hash, never the plain text
+        hashed_password=hashed_pwd,
         is_active=user.is_active,
         role_name=user.role_name,
         role_id=role_id
@@ -247,7 +219,6 @@ def reset_user_password(user_id: int, payload: schemas.UserPasswordReset, db: Se
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Securely hash the new incoming password and update the database
     user.hashed_password = pwd_context.hash(payload.new_password)
     db.commit()
     return {"message": f"Password reset successfully for {user.first_name}."}
