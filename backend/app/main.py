@@ -99,13 +99,33 @@ def create_role(role: schemas.RoleCreate, db: Session = Depends(get_db)):
     
     new_role = models.Role(
         name=role.name,
-        can_create_project=role.can_create_project,
-        can_edit_all_projects=role.can_edit_all_projects
+        is_active=role.is_active,
+        project_create=role.project_create,
+        project_read=role.project_read,
+        project_update=role.project_update,
+        project_delete=role.project_delete,
+        qa_suite_create=role.qa_suite_create,
+        qa_suite_read=role.qa_suite_read,
+        qa_suite_update=role.qa_suite_update,
+        qa_suite_delete=role.qa_suite_delete
     )
     db.add(new_role)
     db.commit()
     db.refresh(new_role)
     return new_role
+
+# @app.put("/roles/{role_id}", response_model=schemas.Role)
+# def update_role(role_id: int, updated_role: schemas.RoleCreate, db: Session = Depends(get_db)):
+#     role = db.query(models.Role).filter(models.Role.id == role_id).first()
+#     if not role:
+#         raise HTTPException(status_code=404, detail="Role not found")
+    
+#     role.name = updated_role.name
+#     role.can_create_project = updated_role.can_create_project
+#     role.can_edit_all_projects = updated_role.can_edit_all_projects
+#     db.commit()
+#     db.refresh(role)
+#     return role
 
 @app.put("/roles/{role_id}", response_model=schemas.Role)
 def update_role(role_id: int, updated_role: schemas.RoleCreate, db: Session = Depends(get_db)):
@@ -114,10 +134,26 @@ def update_role(role_id: int, updated_role: schemas.RoleCreate, db: Session = De
         raise HTTPException(status_code=404, detail="Role not found")
     
     role.name = updated_role.name
-    role.can_create_project = updated_role.can_create_project
-    role.can_edit_all_projects = updated_role.can_edit_all_projects
-    db.commit()
-    db.refresh(role)
+    role.is_active = updated_role.is_active
+    
+    # Explicit CRUD Matrix Mapping
+    role.project_create = updated_role.project_create
+    role.project_read = updated_role.project_read
+    role.project_update = updated_role.project_update
+    role.project_delete = updated_role.project_delete
+    
+    role.qa_suite_create = updated_role.qa_suite_create
+    role.qa_suite_read = updated_role.qa_suite_read
+    role.qa_suite_update = updated_role.qa_suite_update
+    role.qa_suite_delete = updated_role.qa_suite_delete
+    
+    try:
+        db.commit()
+        db.refresh(role)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Database commit failed: {str(e)}")
+        
     return role
 
 @app.delete("/roles/{role_id}")
