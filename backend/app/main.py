@@ -17,17 +17,25 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
 # 2. Configure CORS with explicit domains and dynamic wildcards
-origins = [
-    "https://frontend-sigma-topaz-54.vercel.app",
-    "https://frontend-sigma-topaz-54.vercel.app/",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+# origins = [
+#     "https://frontend-sigma-topaz-54.vercel.app",
+#     "https://frontend-sigma-topaz-54.vercel.app/",
+#     "http://localhost:5173",
+#     "http://127.0.0.1:5173",
+# ]
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Set to False when using allow_origins=["*"] to comply with browser specifications
     allow_methods=["*"],
     allow_headers=["*"],
 )
