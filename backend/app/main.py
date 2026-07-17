@@ -18,10 +18,11 @@ app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 # 2. Native FastAPI CORS Configuration (Handles errors & preflights seamlessly)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_groups=[
-        r"https:\/\/frontend-sigma-topaz-54\.vercel\.app.*",
-        r"http:\/\/localhost:\d+.*",
-        r"http:\/\/127\.0\.0\.1:\d+.*"
+    allow_origins=[
+        "https://frontend-sigma-topaz-54.vercel.app",
+        "https://frontend-sigma-topaz-54.vercel.app/",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
     ],
     allow_credentials=True,
     allow_methods=["*"],
