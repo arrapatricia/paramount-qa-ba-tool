@@ -1,20 +1,71 @@
 import { useState } from 'react';
 import blueLogo from '../assets/PLGIC_Icon Only_blue.png';
 import whiteLogo from '../assets/PLGIC_Icon Only_white.png';
+import { userAPI, roleAPI } from '@/services/api';
 
 interface LoginProps {
   isDarkMode: boolean;
-  onLoginSuccess: () => void;
+  onLoginSuccess: (userData: any) => void;
 }
 
 export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate successful login
-    onLoginSuccess();
+    try {
+      setIsAuthenticating(true);
+      
+      // 1. Fetch live user records from your Railway PostgreSQL database
+      const allUsers = await userAPI.getAll();
+      const matchedUser = allUsers.find(
+        (u: any) => u.email.toLowerCase() === username.trim().toLowerCase() && u.is_active
+      );
+
+      if (!matchedUser) {
+        alert("Invalid account credentials or your account has been deactivated.");
+        return;
+      }
+
+      // 2. Fetch the system matrix settings using the role name assigned to this user
+      const allRoles = await roleAPI.getAll();
+      const linkedRole = allRoles.find((r: any) => r.name === matchedUser.role_name);
+
+      if (!linkedRole || !linkedRole.is_active) {
+        alert("Your assigned security role is either inactive or missing from the database.");
+        return;
+      }
+
+      // 3. Package the full database properties cleanly for App.tsx session tracking
+      const unifiedSessionPayload = {
+        id: matchedUser.id,
+        first_name: matchedUser.first_name,
+        last_name: matchedUser.last_name,
+        email: matchedUser.email,
+        role_name: matchedUser.role_name,
+        permissions: {
+          project_create: linkedRole.project_create,
+          project_read: linkedRole.project_read,
+          project_update: linkedRole.project_update,
+          project_delete: linkedRole.project_delete,
+          qa_suite_create: linkedRole.qa_suite_create,
+          qa_suite_read: linkedRole.qa_suite_read,
+          qa_suite_update: linkedRole.qa_suite_update,
+          qa_suite_delete: linkedRole.qa_suite_delete,
+        }
+      };
+
+      // 4. Pass the real database user profile object up to App.tsx
+      onLoginSuccess(unifiedSessionPayload);
+
+    } catch (err) {
+      console.error("Login verification failed: ", err);
+      alert("Authentication failed. Please check network connectivity or database configurations.");
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
 
   return (
@@ -50,7 +101,7 @@ export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent dark:focus:ring-brand-accent/50 text-sm text-slate-800 dark:text-white placeholder-slate-400 transition-all"
-              placeholder="Enter username" 
+              placeholder="Enter username (Email)" 
             />
           </div>
 
@@ -74,9 +125,10 @@ export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
           {/* Submit Button */}
           <button 
             type="submit" 
-            className="w-full mt-2 py-4 rounded-xl font-bold tracking-wider text-white bg-brand-paramount hover:bg-opacity-95 dark:bg-brand-paramount dark:hover:bg-blue-900 transition-all shadow-lg shadow-blue-900/10 active:scale-[0.99]"
+            disabled={isAuthenticating}
+            className="w-full mt-2 py-4 rounded-xl font-bold tracking-wider text-white bg-brand-paramount hover:bg-opacity-95 dark:bg-brand-paramount dark:hover:bg-blue-900 transition-all shadow-lg shadow-blue-900/10 active:scale-[0.99] disabled:opacity-50"
           >
-            Sign In
+            {isAuthenticating ? 'Verifying Account...' : 'Sign In'}
           </button>
         </form>
       </div>

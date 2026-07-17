@@ -68,26 +68,26 @@ export default function App() {
   };
 
   // Mock login callback integration mapping permission capabilities dynamically
-  const handleLoginSuccess = (userData?: any) => {
+const handleLoginSuccess = (userData: any) => {
     setIsLoggedIn(true);
     
-    // In a complete auth setup, this matches the database data returned from backend
+    // Bind all dynamically loaded properties from database matching role credentials
     setCurrentUser({
-      id: userData?.id || 1,
-      firstName: userData?.first_name || "Pat",
-      lastName: userData?.last_name || "Arra",
-      email: userData?.email || "qatest0321+ba@gmail.com",
-      roleName: userData?.role_name || "Business Analyst",
+      id: userData.id,
+      firstName: userData.first_name,
+      lastName: userData.last_name,
+      email: userData.email,
+      roleName: userData.role_name,
       isActive: true,
       permissions: {
-        projectCreate: userData?.permissions?.project_create ?? true,
-        projectRead: userData?.permissions?.project_read ?? true,
-        projectUpdate: userData?.permissions?.project_update ?? true,
-        projectDelete: userData?.permissions?.project_delete ?? false,
-        qaSuiteCreate: userData?.permissions?.qa_suite_create ?? false,
-        qaSuiteRead: userData?.permissions?.qa_suite_read ?? true,
-        qaSuiteUpdate: userData?.permissions?.qa_suite_update ?? false,
-        qaSuiteDelete: userData?.permissions?.qa_suite_delete ?? false,
+        projectCreate: userData.permissions?.project_create,
+        projectRead: userData.permissions?.project_read,
+        projectUpdate: userData.permissions?.project_update,
+        projectDelete: userData.permissions?.project_delete,
+        qaSuiteCreate: userData.permissions?.qa_suite_create,
+        qaSuiteRead: userData.permissions?.qa_suite_read,
+        qaSuiteUpdate: userData.permissions?.qa_suite_update,
+        qaSuiteDelete: userData.permissions?.qa_suite_delete,
       }
     });
 

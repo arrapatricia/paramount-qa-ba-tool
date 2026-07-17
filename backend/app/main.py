@@ -16,6 +16,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
 # 2. Native FastAPI CORS Configuration (Handles errors & preflights seamlessly)
+# 2. Native FastAPI CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
