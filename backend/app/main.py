@@ -31,22 +31,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3. Startup Event: Pre-populate standard roles if they don't exist yet
+# 3. Startup Event: Pre-populate standard roles with new feature CRUD matrix
 @app.on_event("startup")
 def setup_default_roles():
     db = next(get_db())
     default_roles = [
-        {"name": "Admin", "can_create_project": True, "can_edit_all_projects": True},
-        {"name": "Business Analyst", "can_create_project": True, "can_edit_all_projects": False},
-        {"name": "QA Engineer", "can_create_project": False, "can_edit_all_projects": False},
+        {
+            "name": "Admin", 
+            "is_active": True,
+            "project_create": True, "project_read": True, "project_update": True, "project_delete": True,
+            "qa_suite_create": True, "qa_suite_read": True, "qa_suite_update": True, "qa_suite_delete": True
+        },
+        {
+            "name": "Business Analyst", 
+            "is_active": True,
+            "project_create": True, "project_read": True, "project_update": True, "project_delete": False,
+            "qa_suite_create": False, "qa_suite_read": True, "qa_suite_update": False, "qa_suite_delete": False
+        },
+        {
+            "name": "QA Engineer", 
+            "is_active": False,
+            "project_create": False, "project_read": True, "project_update": False, "project_delete": False,
+            "qa_suite_create": True, "qa_suite_read": True, "qa_suite_update": True, "qa_suite_delete": False
+        },
     ]
     for r_data in default_roles:
         existing = db.query(models.Role).filter(models.Role.name == r_data["name"]).first()
         if not existing:
             new_role = models.Role(
                 name=r_data["name"],
-                can_create_project=r_data["can_create_project"],
-                can_edit_all_projects=r_data["can_edit_all_projects"]
+                is_active=r_data["is_active"],
+                project_create=r_data["project_create"],
+                project_read=r_data["project_read"],
+                project_update=r_data["project_update"],
+                project_delete=r_data["project_delete"],
+                qa_suite_create=r_data["qa_suite_create"],
+                qa_suite_read=r_data["qa_suite_read"],
+                qa_suite_update=r_data["qa_suite_update"],
+                qa_suite_delete=r_data["qa_suite_delete"]
             )
             db.add(new_role)
     db.commit()
