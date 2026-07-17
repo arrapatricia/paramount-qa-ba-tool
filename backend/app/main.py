@@ -3,8 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 from passlib.context import CryptContext
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
 
 # Set up our secure password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -12,28 +10,23 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 from .database import engine, Base, get_db
 from . import models, schemas
 
-# 1. Temporarily drop and reconstruct tables to apply the new column structure
-Base.metadata.drop_all(bind=engine)
+# 1. Initialize the database tables instantly
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
-# 2. Configure Dynamic CORS to completely bypass preflight checks with credentials
-class DynamicCORSMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        if request.method == "OPTIONS":
-            response = Response(status_code=204)
-        else:
-            response = await call_next(request)
-            
-        origin = request.headers.get("origin", "*")
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
-        return response
-
-app.add_middleware(DynamicCORSMiddleware)
+# 2. Native FastAPI CORS Configuration (Handles errors & preflights seamlessly)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_groups=[
+        r"https:\/\/frontend-sigma-topaz-54\.vercel\.app.*",
+        r"http:\/\/localhost:\d+.*",
+        r"http:\/\/127\.0\.0\.1:\d+.*"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 3. Startup Event: Pre-populate standard roles with new feature CRUD matrix
 @app.on_event("startup")
@@ -117,7 +110,6 @@ def update_role(role_id: int, updated_role: schemas.RoleCreate, db: Session = De
     role.name = updated_role.name
     role.is_active = updated_role.is_active
     
-    # Explicit CRUD Matrix Mapping
     role.project_create = updated_role.project_create
     role.project_read = updated_role.project_read
     role.project_update = updated_role.project_update
@@ -166,7 +158,11 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
     
     role = db.query(models.Role).filter(models.Role.name == user.role_name).first()
-    role_id = role.id if role else None
+    if not role:
+        raise HTTPException(status_code=404, detail=f"Assigned system security role '{user.role_name}' does not exist inside the backend tables yet! Configure it first.")
+        
+    role_id = role.id
+
     hashed_pwd = pwd_context.hash(user.password)
 
     new_user = models.User(
@@ -177,10 +173,15 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         is_active=user.is_active,
         role_name=user.role_name,
         role_id=role_id
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+      )
+    try:
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed saving account into SQLite/Postgres: {str(e)}")
+        
     return new_user
 
 @app.put("/users/{user_id}", response_model=schemas.User)
@@ -190,13 +191,15 @@ def update_user(user_id: int, updated_user: schemas.UserBase, db: Session = Depe
         raise HTTPException(status_code=404, detail="User not found")
     
     role = db.query(models.Role).filter(models.Role.name == updated_user.role_name).first()
+    if not role:
+        raise HTTPException(status_code=404, detail=f"Assigned system security role '{updated_user.role_name}' does not exist inside the backend tables yet!")
     
     user.first_name = updated_user.first_name
     user.last_name = updated_user.last_name
     user.email = updated_user.email
     user.is_active = updated_user.is_active
     user.role_name = updated_user.role_name
-    user.role_id = role.id if role else None
+    user.role_id = role.id
 
     db.commit()
     db.refresh(user)
