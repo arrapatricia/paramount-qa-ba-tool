@@ -6,8 +6,19 @@ from typing import Optional, List
 # ==========================================
 class RoleBase(BaseModel):
     name: str
-    can_create_project: bool = False
-    can_edit_all_projects: bool = False
+    is_active: bool = True
+    
+    # Project Feature Permissions Matrix
+    project_create: bool = False
+    project_read: bool = False
+    project_update: bool = False
+    project_delete: bool = False
+    
+    # QA Test Suite Feature Permissions Matrix
+    qa_suite_create: bool = False
+    qa_suite_read: bool = False
+    qa_suite_update: bool = False
+    qa_suite_delete: bool = False
 
 class RoleCreate(RoleBase):
     pass  # Used when creating a new role from the frontend
@@ -30,7 +41,7 @@ class UserBase(BaseModel):
     role_name: str
 
 class UserCreate(UserBase):
-    password: str  # <-- ADD THIS LINE (frontend sends this during registration)
+    password: str  # Frontend sends this during registration
 
 class User(UserBase):
     id: int

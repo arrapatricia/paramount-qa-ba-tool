@@ -4,15 +4,25 @@ from .database import Base
 
 class Role(Base):
     __tablename__ = "roles"
-
+    
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True, nullable=False)
-    can_create_project = Column(Boolean, default=False)
-    can_edit_all_projects = Column(Boolean, default=False)
+    name = Column(String, unique=True, index=True)
+    is_active = Column(Boolean, default=True)
 
-    # Relationship to link users assigned to this role
+    # 1. Project Feature Permissions
+    project_create = Column(Boolean, default=False)
+    project_read = Column(Boolean, default=False)
+    project_update = Column(Boolean, default=False)
+    project_delete = Column(Boolean, default=False)
+
+    # 2. QA Test Suite Feature Permissions
+    qa_suite_create = Column(Boolean, default=False)
+    qa_suite_read = Column(Boolean, default=False)
+    qa_suite_update = Column(Boolean, default=False)
+    qa_suite_delete = Column(Boolean, default=False)
+
+    # Missing back-reference to user model relationship
     users = relationship("User", back_populates="role_rel")
-
 
 class User(Base):
     __tablename__ = "users"
@@ -21,7 +31,7 @@ class User(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)  # <-- ADD THIS LINE
+    hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)

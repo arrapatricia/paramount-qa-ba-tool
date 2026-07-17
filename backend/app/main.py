@@ -10,7 +10,8 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 from .database import engine, Base, get_db
 from . import models, schemas
 
-# 1. Initialize the database tables instantly
+# 1. Temporarily drop and reconstruct tables to apply the new column structure
+Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
