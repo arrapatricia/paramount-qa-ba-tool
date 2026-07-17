@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { userAPI, roleAPI } from '../services/api';
 
-// 1. Updated Interface matching new Database Schema
 interface Role {
   id: number;
   name: string;
@@ -133,6 +132,21 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
   const [qUpdate, setQUpdate] = useState(false);
   const [qDelete, setQDelete] = useState(false);
 
+  // --- Select / Deselect Helper Actions ---
+  const handleToggleAllProjects = (val: boolean) => {
+    setPCreate(val);
+    setPRead(val);
+    setPUpdate(val);
+    setPDelete(val);
+  };
+
+  const handleToggleAllQA = (val: boolean) => {
+    setQCreate(val);
+    setQRead(val);
+    setQUpdate(val);
+    setQDelete(val);
+  };
+
   // --- User Modal states ---
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -228,7 +242,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
     }
   };
 
-  // --- Role Operations (Expanded for CRUD & Status Toggles) ---
+  // --- Role Operations ---
   const handleOpenCreateRole = () => {
     setEditingRole(null);
     setRoleName('');
@@ -467,7 +481,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
           </div>
         )}
 
-        {/* --- Tab 2: Role Directory (CRUD Columns View) --- */}
+        {/* --- Tab 2: Role Directory --- */}
         {adminSection === 'roles' && (
           <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800/50 flex justify-between items-center">
@@ -694,8 +708,15 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 
                 {/* 1. New Project Access Group */}
                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 space-y-3">
-                  <div className="font-extrabold text-brand-paramount dark:text-white text-sm flex items-center gap-1.5">
-                    📂 Projects Management Feature
+                  <div className="flex justify-between items-center">
+                    <div className="font-extrabold text-brand-paramount dark:text-white text-sm flex items-center gap-1.5">
+                      📂 Projects Management Feature
+                    </div>
+                    <div className="flex space-x-2 text-[11px] font-bold">
+                      <button type="button" onClick={() => handleToggleAllProjects(true)} className="text-brand-accent hover:underline">Select All</button>
+                      <span className="text-slate-300">|</span>
+                      <button type="button" onClick={() => handleToggleAllProjects(false)} className="text-slate-400 hover:text-slate-500 hover:underline">Deselect All</button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">
@@ -719,8 +740,15 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
 
                 {/* 2. New QA Test Suite Access Group */}
                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 space-y-3">
-                  <div className="font-extrabold text-brand-paramount dark:text-white text-sm flex items-center gap-1.5">
-                    🧪 QA Test Suites Feature
+                  <div className="flex justify-between items-center">
+                    <div className="font-extrabold text-brand-paramount dark:text-white text-sm flex items-center gap-1.5">
+                      🧪 QA Test Suites Feature
+                    </div>
+                    <div className="flex space-x-2 text-[11px] font-bold">
+                      <button type="button" onClick={() => handleToggleAllQA(true)} className="text-brand-accent hover:underline">Select All</button>
+                      <span className="text-slate-300">|</span>
+                      <button type="button" onClick={() => handleToggleAllQA(false)} className="text-slate-400 hover:text-slate-500 hover:underline">Deselect All</button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">

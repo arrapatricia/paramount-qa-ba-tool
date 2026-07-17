@@ -4,9 +4,29 @@ import UserPortal from './pages/userportal';
 import Projects from './pages/projects';
 import Documentation from './pages/documentation';
 
+// Define the runtime application User object type synced with backend tables
+interface SessionUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  roleName: string;
+  isActive: boolean;
+  permissions: {
+    projectCreate: boolean;
+    projectRead: boolean;
+    projectUpdate: boolean;
+    projectDelete: boolean;
+    qaSuiteCreate: boolean;
+    qaSuiteRead: boolean;
+    qaSuiteUpdate: boolean;
+    qaSuiteDelete: boolean;
+  };
+}
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true); // default dark from image
+  const [isDarkMode, setIsDarkMode] = useState(true);
   
   // Navigation: 'login' | 'projects' | 'users' | 'documentation'
   const [currentView, setCurrentView] = useState<'login' | 'projects' | 'users' | 'documentation'>('login');
@@ -15,11 +35,8 @@ export default function App() {
   // --- Real-time Date and Time State ---
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Logged-in user information (Defaults to Arra)
-  const [currentUser] = useState({
-    firstName: "Arra",
-    lastName: "Del Mundo",
-  });
+  // Logged-in user session state (Populated dynamically on successful authorization)
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
 
   // Updates the clock every single second
   useEffect(() => {
@@ -50,15 +67,38 @@ export default function App() {
     setIsDarkMode(!isDarkMode);
   };
 
-  const handleLoginSuccess = () => {
+  // Mock login callback integration mapping permission capabilities dynamically
+  const handleLoginSuccess = (userData?: any) => {
     setIsLoggedIn(true);
-    setCurrentView('projects'); // Go straight to Projects directory landing page
+    
+    // In a complete auth setup, this matches the database data returned from backend
+    setCurrentUser({
+      id: userData?.id || 1,
+      firstName: userData?.first_name || "Pat",
+      lastName: userData?.last_name || "Arra",
+      email: userData?.email || "qatest0321+ba@gmail.com",
+      roleName: userData?.role_name || "Business Analyst",
+      isActive: true,
+      permissions: {
+        projectCreate: userData?.permissions?.project_create ?? true,
+        projectRead: userData?.permissions?.project_read ?? true,
+        projectUpdate: userData?.permissions?.project_update ?? true,
+        projectDelete: userData?.permissions?.project_delete ?? false,
+        qaSuiteCreate: userData?.permissions?.qa_suite_create ?? false,
+        qaSuiteRead: userData?.permissions?.qa_suite_read ?? true,
+        qaSuiteUpdate: userData?.permissions?.qa_suite_update ?? false,
+        qaSuiteDelete: userData?.permissions?.qa_suite_delete ?? false,
+      }
+    });
+
+    setCurrentView('projects');
   };
 
   const handleLogout = () => {
     if (confirm("Are you sure you want to log out?")) {
       setIsLoggedIn(false);
       setActiveProjectId(null);
+      setCurrentUser(null);
       setCurrentView('login');
     }
   };
@@ -84,29 +124,35 @@ export default function App() {
 
         {/* Global Controls & Dynamic User Widget */}
         <div className="flex items-center space-x-4">
-          {isLoggedIn && (
+          {isLoggedIn && currentUser && (
             <>
-              <button 
-                onClick={() => setCurrentView('projects')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                  currentView === 'projects' || currentView === 'documentation'
-                    ? 'bg-brand-paramount text-white' 
-                    : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
-                }`}
-              >
-                Projects Gallery
-              </button>
+              {/* Projects view is accessible if user has at least read rights */}
+              {currentUser.permissions.projectRead && (
+                <button 
+                  onClick={() => setCurrentView('projects')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                    currentView === 'projects' || currentView === 'documentation'
+                      ? 'bg-brand-paramount text-white' 
+                      : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
+                  }`}
+                >
+                  Projects Gallery
+                </button>
+              )}
               
-              <button 
-                onClick={() => setCurrentView('users')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                  currentView === 'users' 
-                    ? 'bg-brand-paramount text-white' 
-                    : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
-                }`}
-              >
-                Manage Users
-              </button>
+              {/* Dynamic check for global systems access instead of hardcoded strings */}
+              {currentUser.permissions.projectCreate && (
+                <button 
+                  onClick={() => setCurrentView('users')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                    currentView === 'users' 
+                      ? 'bg-brand-paramount text-white' 
+                      : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
+                  }`}
+                >
+                  Manage Users
+                </button>
+              )}
             </>
           )}
 
@@ -119,7 +165,7 @@ export default function App() {
           </button>
 
           {/* 👤 NESTED USER METADATA & LOGOUT PANEL */}
-          {isLoggedIn && (
+          {isLoggedIn && currentUser && (
             <div className="flex items-center pl-4 border-l border-slate-100 dark:border-slate-800 space-x-3">
               
               {/* User Identity & Live Ticking Clock */}
