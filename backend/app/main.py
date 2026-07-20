@@ -10,19 +10,20 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 from .database import engine, Base, get_db
 from . import models, schemas
 
-# 1. Initialize database tables safely without dropping data
-# Base.metadata.create_all(bind=engine)
+# 1. Initialize database tables automatically on server startup
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
-# 2. Native FastAPI CORS Configuration
+# 2. Native FastAPI CORS Configuration (Allows Vercel Frontend & Localhost)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://frontend-sigma-topaz-54.vercel.app",
         "https://frontend-sigma-topaz-54.vercel.app/",
         "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "*"  # Wildcard fallback to eliminate CORS preflight blocks
     ],
     allow_credentials=True,
     allow_methods=["*"],
