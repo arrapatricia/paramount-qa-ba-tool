@@ -12,6 +12,7 @@ interface SessionUser {
   lastName: string;
   email: string;
   roleName: string;
+  role_name?: string;
   isActive: boolean;
   permissions: {
     projectCreate: boolean;
@@ -48,6 +49,9 @@ export default function App() {
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
+  // Strict helper check for Admin Role
+  const isAdmin = currentUser?.roleName === 'Admin' || currentUser?.role_name === 'Admin';
+
   // Handle Login and Default Page Route
   const handleLoginSuccess = (userData: any) => {
     if (!userData) return;
@@ -60,6 +64,7 @@ export default function App() {
       lastName: userData.last_name,
       email: userData.email,
       roleName: userData.role_name,
+      role_name: userData.role_name,
       isActive: true,
       permissions: {
         projectCreate: userData.permissions?.project_create ?? false,
@@ -75,8 +80,8 @@ export default function App() {
 
     setCurrentUser(userPayload);
 
-    // 🎯 QA LANDING PAGE ROUTE: QA Engineers land straight on Test Suites
-    if (userPayload.roleName === 'QA Engineer' || userPayload.permissions.qaSuiteCreate) {
+    // 🎯 ROUTE PER ROLE: QA goes to Test Suites, all others go straight to Projects
+    if (userPayload.roleName === 'QA Engineer') {
       setCurrentView('test-suites');
     } else {
       setCurrentView('projects');
@@ -106,7 +111,7 @@ export default function App() {
         {/* Brand Logo */}
         <div 
           className="flex items-center space-x-2 cursor-pointer" 
-          onClick={() => isLoggedIn && setCurrentView(currentUser?.permissions.qaSuiteCreate ? 'test-suites' : 'projects')}
+          onClick={() => isLoggedIn && setCurrentView(currentUser?.roleName === 'QA Engineer' ? 'test-suites' : 'projects')}
         >
           <span className="text-lg font-bold tracking-tight text-brand-paramount dark:text-white">
             Paramount Docs
@@ -121,7 +126,7 @@ export default function App() {
               {currentUser.permissions.projectRead && (
                 <button 
                   onClick={() => setCurrentView('projects')}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     currentView === 'projects' || currentView === 'documentation'
                       ? 'bg-brand-paramount text-white shadow-sm' 
                       : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
@@ -135,7 +140,7 @@ export default function App() {
               {currentUser.permissions.qaSuiteRead && (
                 <button 
                   onClick={() => setCurrentView('test-suites')}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center space-x-1.5 ${
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center space-x-1.5 cursor-pointer ${
                     currentView === 'test-suites'
                       ? 'bg-brand-paramount text-white shadow-sm' 
                       : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
@@ -145,10 +150,11 @@ export default function App() {
                 </button>
               )}
               
-              {currentUser.permissions.projectCreate && (
+              {/* 🔒 MANAGE USERS TAB: EXCLUSIVELY FOR ADMIN ROLE */}
+              {isAdmin && (
                 <button 
                   onClick={() => setCurrentView('users')}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     currentView === 'users' 
                       ? 'bg-brand-paramount text-white shadow-sm' 
                       : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
@@ -163,7 +169,7 @@ export default function App() {
           {/* Theme Switcher */}
           <button 
             onClick={toggleTheme}
-            className="flex items-center space-x-1.5 px-3 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
           >
             <span>{isDarkMode ? '☀️ Light' : '🌙 Dark'}</span>
           </button>
@@ -182,7 +188,7 @@ export default function App() {
 
               <button 
                 onClick={handleLogout}
-                className="px-3 py-1.5 rounded-lg border border-red-500/20 hover:border-red-500/50 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all duration-200"
+                className="px-3 py-1.5 rounded-lg border border-red-500/20 hover:border-red-500/50 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all duration-200 cursor-pointer"
               >
                 Logout
               </button>
@@ -203,8 +209,13 @@ export default function App() {
             {currentView === 'test-suites' && (
               <TestSuites isDarkMode={isDarkMode} currentUser={currentUser} />
             )}
+            {/* 🔒 VIEW GUARD: ONLY ADMIN USERS CAN RENDER USERPORTAL */}
             {currentView === 'users' && (
-              <UserPortal isDarkMode={isDarkMode} />
+              isAdmin ? (
+                <UserPortal isDarkMode={isDarkMode} currentUser={currentUser} />
+              ) : (
+                <Projects isDarkMode={isDarkMode} onOpenProject={handleOpenProject} />
+              )
             )}
             {currentView === 'documentation' && (
               <Documentation isDarkMode={isDarkMode} onBackToProjects={() => setCurrentView('projects')} />

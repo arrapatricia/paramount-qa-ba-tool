@@ -46,7 +46,7 @@ const DEFAULT_PROJECT_SPECS: ProjectSpecs = {
 
 export default function Documentation({ isDarkMode, onBackToProjects, selectedProject }: DocumentationProps) {
   
-  // Dynamic state resolver: Safely loads from either localStorage (most robust) or selectedProject prop fallback
+  // Dynamic state resolver: Safely loads from either localStorage or selectedProject prop fallback
   const [projectSpecs, setProjectSpecs] = useState<ProjectSpecs>(() => {
     const cached = localStorage.getItem('qa_ba_current_project');
     if (cached) {
@@ -78,7 +78,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
     };
   });
 
-  // Dynamic user mapping for auditing logs (no hardcoded "Arra")
+  // Dynamic user mapping for auditing logs
   const currentUser = projectSpecs.baAssigned !== "Unassigned" ? projectSpecs.baAssigned : "System User";
 
   // Document states
@@ -306,14 +306,14 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-73px)]">
+    <div className={`flex flex-col h-[calc(100vh-73px)] ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
       
       {/* Utility Bar */}
       <div className="bg-slate-50 dark:bg-neutral-cardDark/40 border-b border-slate-100 dark:border-slate-800/80 px-6 py-3 flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <button 
             onClick={onBackToProjects}
-            className="text-xs font-bold text-slate-500 hover:text-brand-paramount dark:hover:text-white flex items-center space-x-1.5 transition-all"
+            className="text-xs font-bold text-slate-500 hover:text-brand-paramount dark:hover:text-white flex items-center space-x-1.5 transition-all cursor-pointer"
           >
             <span>← Back to Projects</span>
           </button>
@@ -321,7 +321,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
           
           <button 
             onClick={() => setIsAiPanelOpen(!isAiPanelOpen)}
-            className="px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+            className="px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
           >
             {isAiPanelOpen ? '⬅️ Collapse Nav' : '📂 Open Doc Nav'}
           </button>
@@ -331,13 +331,13 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
           <div className="flex bg-slate-100 dark:bg-neutral-cardDark/80 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
             <button 
               onClick={() => setEditorMode('visual')}
-              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide ${editorMode === 'visual' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'visual' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
             >
               🎨 Visual Mode
             </button>
             <button 
               onClick={() => setEditorMode('code')}
-              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide ${editorMode === 'code' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'code' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
             >
               💻 HTML Code Mode
             </button>
@@ -345,7 +345,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
 
           <button 
             onClick={handleExportDoc}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-sm"
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
           >
             📄 Save as Docs / PDF
           </button>
@@ -369,7 +369,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     <button
                       key={p.id}
                       onClick={() => scrollToSection(p.id)}
-                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-neutral-obsidian/40 border-l-2 border-transparent hover:border-blue-500 transition-all block truncate"
+                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-neutral-obsidian/40 border-l-2 border-transparent hover:border-blue-500 transition-all block truncate cursor-pointer"
                     >
                       📄 {p.title}
                     </button>
@@ -387,7 +387,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     placeholder="Add BA Page..."
                     className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
                   />
-                  <button type="submit" className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-extrabold">＋</button>
+                  <button type="submit" className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-extrabold cursor-pointer">＋</button>
                 </form>
               </div>
 
@@ -401,7 +401,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     <button
                       key={suite.id}
                       onClick={() => scrollToSection(suite.id)}
-                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 border-l-2 border-transparent hover:border-emerald-500 transition-all block truncate"
+                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 border-l-2 border-transparent hover:border-emerald-500 transition-all block truncate cursor-pointer"
                     >
                       🧪 {suite.title}
                     </button>
@@ -419,7 +419,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     placeholder="Add QA Suite..."
                     className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
                   />
-                  <button type="submit" className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-extrabold">＋</button>
+                  <button type="submit" className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-extrabold cursor-pointer">＋</button>
                 </form>
               </div>
 
@@ -438,7 +438,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                       <button 
                         type="button" 
                         onClick={() => handleRemoveWordTag(tag)}
-                        className="hover:bg-blue-500/20 text-[11px] leading-none rounded-full w-3.5 h-3.5 inline-flex items-center justify-center"
+                        className="hover:bg-blue-500/20 text-[11px] leading-none rounded-full w-3.5 h-3.5 inline-flex items-center justify-center cursor-pointer"
                       >
                         ×
                       </button>
@@ -453,7 +453,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     placeholder="Add tag..."
                     className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
                   />
-                  <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-extrabold">＋</button>
+                  <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-extrabold cursor-pointer">＋</button>
                 </form>
               </div>
 
@@ -471,7 +471,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                 <button
                   disabled={isGenerating || !aiPrompt.trim()}
                   onClick={() => handleAiGenerate(aiPrompt)}
-                  className="w-full py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-extrabold disabled:opacity-50"
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-extrabold disabled:opacity-50 cursor-pointer"
                 >
                   {isGenerating ? '⏳ Appending...' : '✨ Append to Document'}
                 </button>
@@ -486,14 +486,14 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
           
           {editorMode === 'visual' && (
             <div className="bg-white dark:bg-neutral-cardDark border-b border-slate-100 dark:border-slate-800 sticky top-0 z-10 px-6 py-2.5 flex items-center space-x-2.5 shadow-sm">
-              <button onClick={() => formatVisual('bold')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-black dark:text-white">B</button>
-              <button onClick={() => formatVisual('italic')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs italic font-black dark:text-white">I</button>
-              <button onClick={() => formatVisual('underline')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs underline font-black dark:text-white">U</button>
+              <button onClick={() => formatVisual('bold')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-black dark:text-white cursor-pointer">B</button>
+              <button onClick={() => formatVisual('italic')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs italic font-black dark:text-white cursor-pointer">I</button>
+              <button onClick={() => formatVisual('underline')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs underline font-black dark:text-white cursor-pointer">U</button>
               <span className="text-slate-300">|</span>
               
               <select 
                 onChange={(e) => formatVisual('fontName', e.target.value)}
-                className="text-[11px] font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-neutral-cardDark text-slate-700 dark:text-slate-200 rounded px-2 py-1 outline-none"
+                className="text-[11px] font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-neutral-cardDark text-slate-700 dark:text-slate-200 rounded px-2 py-1 outline-none cursor-pointer"
               >
                 <option value="Segoe UI">Default Font</option>
                 <option value="Courier New">Typewriter (Monospace)</option>
@@ -502,15 +502,15 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
               </select>
 
               <span className="text-slate-300">|</span>
-              <button onClick={() => formatVisual('formatBlock', '<h2>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white">H2</button>
-              <button onClick={() => formatVisual('formatBlock', '<h3>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white">H3</button>
+              <button onClick={() => formatVisual('formatBlock', '<h2>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white cursor-pointer">H2</button>
+              <button onClick={() => formatVisual('formatBlock', '<h3>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white cursor-pointer">H3</button>
               <span className="text-slate-300">|</span>
-              <button onClick={() => formatVisual('insertUnorderedList')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs dark:text-white">• List</button>
+              <button onClick={() => formatVisual('insertUnorderedList')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs dark:text-white cursor-pointer">• List</button>
               
               <span className="text-slate-300">|</span>
               <button 
                 onClick={insertTable} 
-                className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-bold dark:text-white"
+                className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-bold dark:text-white cursor-pointer"
               >
                 Table
               </button>
@@ -673,7 +673,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                   <select 
                     value={projectSpecs.status}
                     onChange={(e) => updateSpecField('status', e.target.value)}
-                    className="bg-transparent dark:bg-neutral-cardDark font-black border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 text-emerald-500 text-[10px]"
+                    className="bg-transparent dark:bg-neutral-cardDark font-black border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 text-emerald-500 text-[10px] cursor-pointer"
                   >
                     <option value="Active">Active</option>
                     <option value="Completed">Completed</option>
@@ -688,7 +688,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                       <button 
                         key={track}
                         onClick={() => updateSpecField('progress', track)}
-                        className={`px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-tight transition-all ${
+                        className={`px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-tight transition-all cursor-pointer ${
                           projectSpecs.progress === track
                             ? 'bg-blue-600 text-white'
                             : 'bg-slate-100 dark:bg-neutral-obsidian/60 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'

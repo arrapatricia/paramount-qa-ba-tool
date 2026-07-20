@@ -80,24 +80,28 @@ def setup_default_roles():
                 db.add(new_role)
         db.commit()
 
-        # --- Seed Default Admin User ---
+        # --- Seed / Reset Default Admin User ---
         admin_email = "admin@paramount.com"
         existing_admin = db.query(models.User).filter(models.User.email == admin_email).first()
+        hashed_admin_pwd = pwd_context.hash("admin123")
+
         if not existing_admin:
             admin_role = db.query(models.Role).filter(models.Role.name == "Admin").first()
-            hashed_pwd = pwd_context.hash("admin123")
-            
             default_admin = models.User(
                 first_name="Admin",
                 last_name="System",
                 email=admin_email,
-                hashed_password=hashed_pwd,
+                hashed_password=hashed_admin_pwd,
                 is_active=True,
                 role_name="Admin",
                 role_id=admin_role.id if admin_role else None
             )
             db.add(default_admin)
-            db.commit()
+        else:
+            # Always ensure admin@paramount.com password is a valid hash of 'admin123'
+            existing_admin.hashed_password = hashed_admin_pwd
+
+        db.commit()
             
     except Exception as e:
         print(f"Startup database seeding error: {e}")
@@ -117,8 +121,30 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     # 1. Fetch user by email
     user = db.query(models.User).filter(models.User.email.ilike(clean_email)).first()
     
-    # 2. Verify existence and hashed password match
-    if not user or not pwd_context.verify(credentials.password, user.hashed_password):
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password."
+        )
+
+    # 2. Flexible password verification with legacy plain-text fallback & auto-upgrade
+    is_password_valid = False
+    try:
+        is_password_valid = pwd_context.verify(credentials.password, user.hashed_password)
+    except Exception:
+        # Triggers if DB contains unhashed plain text from old records
+        if user.hashed_password == credentials.password:
+            is_password_valid = True
+            # Upgrade stored password to secure hash
+            user.hashed_password = pwd_context.hash(credentials.password)
+            db.commit()
+
+    if not is_password_valid and user.hashed_password == credentials.password:
+        is_password_valid = True
+        user.hashed_password = pwd_context.hash(credentials.password)
+        db.commit()
+
+    if not is_password_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password."
@@ -251,7 +277,6 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Assigned system security role '{user.role_name}' does not exist inside the backend tables yet! Configure it first.")
         
     role_id = role.id
-
     hashed_pwd = pwd_context.hash(user.password)
 
     new_user = models.User(

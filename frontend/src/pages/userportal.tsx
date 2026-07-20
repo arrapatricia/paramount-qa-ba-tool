@@ -36,9 +36,14 @@ interface AdminLog {
 
 interface UserPortalProps {
   isDarkMode: boolean;
+  currentUser?: any;
 }
 
-export default function UserPortal({ isDarkMode }: UserPortalProps) {
+export default function UserPortal({ isDarkMode, currentUser }: UserPortalProps) {
+  // 🔒 Resolve logged-in user & check Admin access
+  const activeUser = currentUser || JSON.parse(localStorage.getItem('qa_ba_user') || '{}');
+  const isAdmin = activeUser?.role_name === 'Admin' || activeUser?.role === 'Admin';
+
   // --- Core State synced with backend database ---
   const [roles, setRoles] = useState<Role[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -153,6 +158,10 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
 
   // --- User Operations ---
   const handleOpenCreateUser = () => {
+    if (!isAdmin) {
+      alert("Access Denied: Only Admin users can create accounts.");
+      return;
+    }
     setEditingUser(null);
     setUsrFirstName('');
     setUsrLastName('');
@@ -163,6 +172,10 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
   };
 
   const handleOpenEditUser = (user: User) => {
+    if (!isAdmin) {
+      alert("Access Denied: Only Admin users can modify accounts.");
+      return;
+    }
     setEditingUser(user);
     setUsrFirstName(user.first_name);
     setUsrLastName(user.last_name);
@@ -173,9 +186,14 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      alert("Access Denied: Admin authorization required.");
+      return;
+    }
+
     try {
       if (editingUser) {
-        // 1. Send update request to FastAPI backend
+        // Send update request to FastAPI backend
         await userAPI.update(editingUser.id, {
           first_name: usrFirstName,
           last_name: usrLastName,
@@ -184,14 +202,14 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
           role_name: usrRole,
         });
 
-        // 2. Re-fetch all users directly from Railway DB to ensure live sync
+        // Re-fetch all users directly from Railway DB
         const freshUsers = await userAPI.getAll();
         setUsers(freshUsers);
 
         addLog('User', 'UPDATED', `User profile altered: ${usrFirstName} ${usrLastName} assigned as ${usrRole}.`);
       } else {
         // Create new user
-        const created = await userAPI.create({
+        await userAPI.create({
           first_name: usrFirstName,
           last_name: usrLastName,
           email: usrEmail,
@@ -213,6 +231,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
   };
 
   const toggleUserStatus = async (id: number) => {
+    if (!isAdmin) return;
     try {
       const updated = await userAPI.toggleStatus(id);
       setUsers(users.map(u => (u.id === id ? updated : u)));
@@ -223,6 +242,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
   };
 
   const handleDeleteUser = async (id: number) => {
+    if (!isAdmin) return;
     const targetUser = users.find(u => u.id === id);
     if (targetUser) {
       if (confirm(`Are you sure you want to delete user ${targetUser.first_name}?`)) {
@@ -239,7 +259,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (resetUserId === null) return;
+    if (!isAdmin || resetUserId === null) return;
     try {
       await userAPI.resetPassword(resetUserId, { new_password: newPassword });
       const targetUser = users.find(u => u.id === resetUserId);
@@ -254,6 +274,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
 
   // --- Role Operations ---
   const handleOpenCreateRole = () => {
+    if (!isAdmin) return;
     setEditingRole(null);
     setRoleName('');
     setRoleIsActive(true);
@@ -263,6 +284,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
   };
 
   const handleOpenEditRole = (role: Role) => {
+    if (!isAdmin) return;
     setEditingRole(role);
     setRoleName(role.name);
     setRoleIsActive(role.is_active);
@@ -282,6 +304,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
 
   const handleSaveRole = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) return;
     const roleData = {
       name: roleName,
       is_active: roleIsActive,
@@ -312,6 +335,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
   };
 
   const handleDeleteRole = async (id: number) => {
+    if (!isAdmin) return;
     const roleToDelete = roles.find(r => r.id === id);
     if (roleToDelete) {
       if (['Admin', 'Business Analyst', 'QA Engineer'].includes(roleToDelete.name)) {
@@ -334,7 +358,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
     return (
       <div className="flex h-screen items-center justify-center bg-neutral-obsidian text-white">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-brand-accent border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-sm font-semibold tracking-wider text-slate-400">CONNECTING TO DATABASE...</p>
         </div>
       </div>
@@ -355,7 +379,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
           <div className="flex gap-2 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-800">
             <button
               onClick={() => setAdminSection('users')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 adminSection === 'users' ? 'bg-brand-paramount text-white shadow-md' : 'text-slate-400 hover:text-slate-500'
               }`}
             >
@@ -363,7 +387,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
             </button>
             <button
               onClick={() => setAdminSection('roles')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 adminSection === 'roles' ? 'bg-brand-paramount text-white shadow-md' : 'text-slate-400 hover:text-slate-500'
               }`}
             >
@@ -371,7 +395,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
             </button>
             <button
               onClick={() => setAdminSection('logs')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 adminSection === 'logs' ? 'bg-brand-paramount text-white shadow-md' : 'text-slate-400 hover:text-slate-500'
               }`}
             >
@@ -388,11 +412,11 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
           </div>
           <div className="rounded-2xl border border-slate-100 dark:border-neutral-800/80 bg-white dark:bg-neutral-cardDark p-6 shadow-sm">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-2">Custom Roles</span>
-            <span className="text-4xl font-black text-brand-accent">{roles.length}</span>
+            <span className="text-4xl font-black text-blue-600">{roles.length}</span>
           </div>
           <div className="rounded-2xl border border-slate-100 dark:border-neutral-800/80 bg-white dark:bg-neutral-cardDark p-6 shadow-sm">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-2">Logs Captured</span>
-            <span className="text-4xl font-black text-brand-accent">{logs.length}</span>
+            <span className="text-4xl font-black text-blue-600">{logs.length}</span>
           </div>
         </div>
 
@@ -401,12 +425,20 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
           <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800/50 flex justify-between items-center">
               <h2 className="text-lg font-bold text-brand-paramount dark:text-white">Active Users</h2>
-              <button
-                onClick={handleOpenCreateUser}
-                className="px-4 py-2 bg-brand-accent hover:opacity-95 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow transition-all"
-              >
-                + Add New User
-              </button>
+              
+              {/* 🔒 ONLY SHOW "+ Add New User" FOR ADMINS */}
+              {isAdmin ? (
+                <button
+                  onClick={handleOpenCreateUser}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow transition-all cursor-pointer"
+                >
+                  + Add New User
+                </button>
+              ) : (
+                <span className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                  🔒 Read-Only Access
+                </span>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -416,7 +448,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                     <th className="p-6">User</th>
                     <th className="p-6">Role</th>
                     <th className="p-6">Status</th>
-                    <th className="p-6 text-right">Actions</th>
+                    {isAdmin && <th className="p-6 text-right">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30 text-sm">
@@ -439,50 +471,54 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                           </span>
                         </div>
                       </td>
-                      <td className="p-6 text-right">
-                        <div className="flex items-center justify-end space-x-6">
-                          
-                          <div className="flex items-center space-x-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">Status</span>
-                            <button
-                              onClick={() => toggleUserStatus(u.id)}
-                              className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none ${
-                                u.is_active ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-800'
-                              }`}
-                            >
-                              <div
-                                className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
-                                  u.is_active ? 'translate-x-6' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                          </div>
 
-                          <div className="flex items-center space-x-3 border-l border-slate-100 dark:border-slate-800 pl-4">
-                            <button
-                              onClick={() => {
-                                setResetUserId(u.id);
-                                setIsResetModalOpen(true);
-                              }}
-                              className="text-xs font-bold text-slate-400 dark:text-slate-500 hover:text-brand-accent uppercase tracking-widest hover:underline"
-                            >
-                              Reset PW
-                            </button>
-                            <button
-                              onClick={() => handleOpenEditUser(u)}
-                              className="text-xs font-bold text-brand-accent uppercase tracking-widest hover:underline"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(u.id)}
-                              className="text-xs font-bold text-red-500 uppercase tracking-widest hover:underline"
-                            >
-                              Delete
-                            </button>
+                      {/* 🔒 ADMIN-ONLY USER ACTIONS */}
+                      {isAdmin && (
+                        <td className="p-6 text-right">
+                          <div className="flex items-center justify-end space-x-6">
+                            
+                            <div className="flex items-center space-x-2">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">Status</span>
+                              <button
+                                onClick={() => toggleUserStatus(u.id)}
+                                className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none cursor-pointer ${
+                                  u.is_active ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-800'
+                                }`}
+                              >
+                                <div
+                                  className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                                    u.is_active ? 'translate-x-6' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center space-x-3 border-l border-slate-100 dark:border-slate-800 pl-4">
+                              <button
+                                onClick={() => {
+                                  setResetUserId(u.id);
+                                  setIsResetModalOpen(true);
+                                }}
+                                className="text-xs font-bold text-slate-400 dark:text-slate-500 hover:text-blue-600 uppercase tracking-widest hover:underline cursor-pointer"
+                              >
+                                Reset PW
+                              </button>
+                              <button
+                                onClick={() => handleOpenEditUser(u)}
+                                className="text-xs font-bold text-blue-600 uppercase tracking-widest hover:underline cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(u.id)}
+                                className="text-xs font-bold text-red-500 uppercase tracking-widest hover:underline cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -496,12 +532,20 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
           <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800/50 flex justify-between items-center">
               <h2 className="text-lg font-bold text-brand-paramount dark:text-white">System Permission Levels</h2>
-              <button
-                onClick={handleOpenCreateRole}
-                className="px-4 py-2 bg-brand-accent hover:opacity-95 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow transition-all"
-              >
-                + Create Custom Role
-              </button>
+              
+              {/* 🔒 ONLY SHOW "+ Create Custom Role" FOR ADMINS */}
+              {isAdmin ? (
+                <button
+                  onClick={handleOpenCreateRole}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow transition-all cursor-pointer"
+                >
+                  + Create Custom Role
+                </button>
+              ) : (
+                <span className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                  🔒 Read-Only Access
+                </span>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -512,7 +556,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                     <th className="p-6">Status</th>
                     <th className="p-6">Project Matrix (CRUD)</th>
                     <th className="p-6">QA Suite Matrix (CRUD)</th>
-                    <th className="p-6 text-right">Actions</th>
+                    {isAdmin && <th className="p-6 text-right">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30 text-sm">
@@ -544,22 +588,24 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                           <span className={r.qa_suite_delete ? "text-red-500 font-bold" : "text-slate-300 dark:text-slate-700"}>D</span>
                         </div>
                       </td>
-                      <td className="p-6 text-right">
-                        <div className="flex items-center justify-end space-x-4">
-                          <button
-                            onClick={() => handleOpenEditRole(r)}
-                            className="text-xs font-bold text-brand-accent uppercase tracking-widest hover:underline"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRole(r.id)}
-                            className="text-xs font-bold text-red-500 uppercase tracking-widest hover:underline"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+                      {isAdmin && (
+                        <td className="p-6 text-right">
+                          <div className="flex items-center justify-end space-x-4">
+                            <button
+                              onClick={() => handleOpenEditRole(r)}
+                              className="text-xs font-bold text-blue-600 uppercase tracking-widest hover:underline cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRole(r.id)}
+                              className="text-xs font-bold text-red-500 uppercase tracking-widest hover:underline cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -599,8 +645,8 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
 
       </div>
 
-      {/* --- MODAL 1: REGISTER/EDIT USER --- */}
-      {isUserModalOpen && (
+      {/* --- MODAL 1: REGISTER/EDIT USER (ADMIN ONLY) --- */}
+      {isUserModalOpen && isAdmin && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-8 shadow-2xl border border-slate-100 dark:border-neutral-800">
             <h3 className="text-xl font-bold text-brand-paramount dark:text-white mb-6">
@@ -612,14 +658,14 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">First Name</label>
                   <input
                     type="text" required value={usrFirstName} onChange={(e) => setUsrFirstName(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-800 dark:text-white"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Last Name</label>
                   <input
                     type="text" required value={usrLastName} onChange={(e) => setUsrLastName(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-800 dark:text-white"
                   />
                 </div>
               </div>
@@ -628,7 +674,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Email Address (Login)</label>
                 <input
                   type="email" required value={usrEmail} onChange={(e) => setUsrEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-800 dark:text-white"
                 />
               </div>
 
@@ -638,7 +684,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                   <input
                     type="password" required value={usrPassword} onChange={(e) => setUsrPassword(e.target.value)}
                     placeholder="Choose a secure password"
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-800 dark:text-white"
                   />
                 </div>
               )}
@@ -647,7 +693,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Assign Security Role</label>
                 <select
                   value={usrRole} onChange={(e) => setUsrRole(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white cursor-pointer"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-800 dark:text-white cursor-pointer"
                 >
                   {roles.map(r => (
                     <option key={r.id} value={r.name}>{r.name}</option>
@@ -658,13 +704,13 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
               <div className="flex justify-end space-x-2 pt-4">
                 <button
                   type="button" onClick={() => setIsUserModalOpen(false)}
-                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2.5 bg-brand-accent text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow hover:opacity-90 transition-all"
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow cursor-pointer transition-all"
                 >
                   Save User
                 </button>
@@ -674,12 +720,11 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
         </div>
       )}
 
-      {/* --- MODAL 2: CREATE/EDIT ROLE WITH DYNAMIC FEATURE-BY-FEATURE CRUD MATRIX --- */}
-      {isRoleModalOpen && (
+      {/* --- MODAL 2: CREATE/EDIT ROLE (ADMIN ONLY) --- */}
+      {isRoleModalOpen && isAdmin && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-xl bg-white dark:bg-neutral-cardDark rounded-2xl p-8 shadow-2xl border border-slate-100 dark:border-neutral-800">
             
-            {/* Modal Header containing Global Active Toggle */}
             <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100 dark:border-slate-800/50">
               <h3 className="text-xl font-bold text-brand-paramount dark:text-white">
                 {editingRole ? `Modify Role: ${editingRole.name}` : 'Create Custom Security Role'}
@@ -690,7 +735,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 <button
                   type="button"
                   onClick={() => setRoleIsActive(!roleIsActive)}
-                  className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none ${
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none cursor-pointer ${
                     roleIsActive ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-800'
                   }`}
                 >
@@ -708,7 +753,7 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Role Name</label>
                 <input
                   type="text" required value={roleName} onChange={(e) => setRoleName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-800 dark:text-white"
                 />
               </div>
 
@@ -716,65 +761,65 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
               <div className="space-y-6 border-t border-slate-100 dark:border-slate-800/80 pt-4">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Feature Access Matrix Permissions</p>
                 
-                {/* 1. New Project Access Group */}
+                {/* 1. Project Access Group */}
                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 space-y-3">
                   <div className="flex justify-between items-center">
                     <div className="font-extrabold text-brand-paramount dark:text-white text-sm flex items-center gap-1.5">
                       📂 Projects Management Feature
                     </div>
                     <div className="flex space-x-2 text-[11px] font-bold">
-                      <button type="button" onClick={() => handleToggleAllProjects(true)} className="text-brand-accent hover:underline">Select All</button>
+                      <button type="button" onClick={() => handleToggleAllProjects(true)} className="text-blue-600 hover:underline cursor-pointer">Select All</button>
                       <span className="text-slate-300">|</span>
-                      <button type="button" onClick={() => handleToggleAllProjects(false)} className="text-slate-400 hover:text-slate-500 hover:underline">Deselect All</button>
+                      <button type="button" onClick={() => handleToggleAllProjects(false)} className="text-slate-400 hover:text-slate-500 hover:underline cursor-pointer">Deselect All</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={pCreate} onChange={(e) => setPCreate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <input type="checkbox" checked={pCreate} onChange={(e) => setPCreate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer" />
                       <span className="font-medium text-slate-700 dark:text-slate-300">Create</span>
                     </label>
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={pRead} onChange={(e) => setPRead(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <input type="checkbox" checked={pRead} onChange={(e) => setPRead(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer" />
                       <span className="font-medium text-slate-700 dark:text-slate-300">Read</span>
                     </label>
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={pUpdate} onChange={(e) => setPUpdate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <input type="checkbox" checked={pUpdate} onChange={(e) => setPUpdate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer" />
                       <span className="font-medium text-slate-700 dark:text-slate-300">Update</span>
                     </label>
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={pDelete} onChange={(e) => setPDelete(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <input type="checkbox" checked={pDelete} onChange={(e) => setPDelete(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer" />
                       <span className="font-medium text-slate-700 dark:text-slate-300">Delete</span>
                     </label>
                   </div>
                 </div>
 
-                {/* 2. New QA Test Suite Access Group */}
+                {/* 2. QA Test Suite Access Group */}
                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 space-y-3">
                   <div className="flex justify-between items-center">
                     <div className="font-extrabold text-brand-paramount dark:text-white text-sm flex items-center gap-1.5">
                       🧪 QA Test Suites Feature
                     </div>
                     <div className="flex space-x-2 text-[11px] font-bold">
-                      <button type="button" onClick={() => handleToggleAllQA(true)} className="text-brand-accent hover:underline">Select All</button>
+                      <button type="button" onClick={() => handleToggleAllQA(true)} className="text-blue-600 hover:underline cursor-pointer">Select All</button>
                       <span className="text-slate-300">|</span>
-                      <button type="button" onClick={() => handleToggleAllQA(false)} className="text-slate-400 hover:text-slate-500 hover:underline">Deselect All</button>
+                      <button type="button" onClick={() => handleToggleAllQA(false)} className="text-slate-400 hover:text-slate-500 hover:underline cursor-pointer">Deselect All</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={qCreate} onChange={(e) => setQCreate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <input type="checkbox" checked={qCreate} onChange={(e) => setQCreate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer" />
                       <span className="font-medium text-slate-700 dark:text-slate-300">Create</span>
                     </label>
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={qRead} onChange={(e) => setQRead(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <input type="checkbox" checked={qRead} onChange={(e) => setQRead(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer" />
                       <span className="font-medium text-slate-700 dark:text-slate-300">Read</span>
                     </label>
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={qUpdate} onChange={(e) => setQUpdate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <input type="checkbox" checked={qUpdate} onChange={(e) => setQUpdate(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer" />
                       <span className="font-medium text-slate-700 dark:text-slate-300">Update</span>
                     </label>
                     <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={qDelete} onChange={(e) => setQDelete(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent cursor-pointer" />
+                      <input type="checkbox" checked={qDelete} onChange={(e) => setQDelete(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer" />
                       <span className="font-medium text-slate-700 dark:text-slate-300">Delete</span>
                     </label>
                   </div>
@@ -784,13 +829,13 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
               <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100 dark:border-slate-800/50">
                 <button
                   type="button" onClick={() => setIsRoleModalOpen(false)}
-                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2.5 bg-brand-accent text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow hover:opacity-90 transition-all"
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow transition-all cursor-pointer"
                 >
                   Save Role
                 </button>
@@ -800,8 +845,8 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
         </div>
       )}
 
-      {/* --- MODAL 3: SECURE PASSWORD RESET --- */}
-      {isResetModalOpen && (
+      {/* --- MODAL 3: SECURE PASSWORD RESET (ADMIN ONLY) --- */}
+      {isResetModalOpen && isAdmin && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-sm bg-white dark:bg-neutral-cardDark rounded-2xl p-8 shadow-2xl border border-slate-100 dark:border-neutral-800">
             <h3 className="text-xl font-bold text-brand-paramount dark:text-white mb-2">Reset Password</h3>
@@ -813,20 +858,20 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
                 <input
                   type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter secure password"
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-accent text-slate-800 dark:text-white"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-800 dark:text-white"
                 />
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">
                 <button
                   type="button" onClick={() => { setIsResetModalOpen(false); setNewPassword(''); }}
-                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2.5 bg-brand-accent text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow hover:opacity-90 transition-all"
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow transition-all cursor-pointer"
                 >
                   Confirm Reset
                 </button>
