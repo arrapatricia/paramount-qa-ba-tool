@@ -10,12 +10,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 from .database import engine, Base, get_db
 from . import models, schemas
 
-# 1. Initialize the database tables instantly
+# 1. Initialize database tables safely without dropping data
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
-# 2. Native FastAPI CORS Configuration (Handles errors & preflights seamlessly)
 # 2. Native FastAPI CORS Configuration
 app.add_middleware(
     CORSMiddleware,
@@ -30,57 +29,75 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3. Startup Event: Pre-populate standard roles AND a default Admin user
+# 3. Startup Event: Pre-populate standard roles AND default Admin user safely
 @app.on_event("startup")
 def setup_default_roles():
     db = next(get_db())
-    
-    # --- Seed Default Roles ---
-    default_roles = [
-        {
-            "name": "Admin", 
-            "is_active": True,
-            "project_create": True, "project_read": True, "project_update": True, "project_delete": True,
-            "qa_suite_create": True, "qa_suite_read": True, "qa_suite_update": True, "qa_suite_delete": True
-        },
-        {
-            "name": "Business Analyst", 
-            "is_active": True,
-            "project_create": True, "project_read": True, "project_update": True, "project_delete": False,
-            "qa_suite_create": False, "qa_suite_read": True, "qa_suite_update": False, "qa_suite_delete": False
-        },
-        {
-            "name": "QA Engineer", 
-            "is_active": True,
-            "project_create": False, "project_read": True, "project_update": False, "project_delete": False,
-            "qa_suite_create": True, "qa_suite_read": True, "qa_suite_update": True, "qa_suite_delete": False
-        },
-    ]
-    for r_data in default_roles:
-        existing = db.query(models.Role).filter(models.Role.name == r_data["name"]).first()
-        if not existing:
-            new_role = models.Role(**r_data)
-            db.add(new_role)
-    db.commit()
-
-    # --- Seed Default Admin User ---
-    admin_email = "admin@paramount.com"
-    existing_admin = db.query(models.User).filter(models.User.email == admin_email).first()
-    if not existing_admin:
-        admin_role = db.query(models.Role).filter(models.Role.name == "Admin").first()
-        hashed_pwd = pwd_context.hash("admin123")
-        
-        default_admin = models.User(
-            first_name="Admin",
-            last_name="System",
-            email=admin_email,
-            hashed_password=hashed_pwd,
-            is_active=True,
-            role_name="Admin",
-            role_id=admin_role.id if admin_role else None
-        )
-        db.add(default_admin)
+    try:
+        # --- Seed Default System Roles ---
+        default_roles = [
+            {
+                "name": "Admin", 
+                "is_active": True,
+                "project_create": True, "project_read": True, "project_update": True, "project_delete": True,
+                "qa_suite_create": True, "qa_suite_read": True, "qa_suite_update": True, "qa_suite_delete": True
+            },
+            {
+                "name": "Business Analyst", 
+                "is_active": True,
+                "project_create": True, "project_read": True, "project_update": True, "project_delete": False,
+                "qa_suite_create": False, "qa_suite_read": True, "qa_suite_update": False, "qa_suite_delete": False
+            },
+            {
+                "name": "QA Engineer", 
+                "is_active": True,
+                "project_create": False, "project_read": True, "project_update": False, "project_delete": False,
+                "qa_suite_create": True, "qa_suite_read": True, "qa_suite_update": True, "qa_suite_delete": False
+            },
+        ]
+        for r_data in default_roles:
+            existing = db.query(models.Role).filter(models.Role.name == r_data["name"]).first()
+            if not existing:
+                new_role = models.Role(
+                    name=r_data["name"],
+                    is_active=r_data["is_active"],
+                    project_create=r_data["project_create"],
+                    project_read=r_data["project_read"],
+                    project_update=r_data["project_update"],
+                    project_delete=r_data["project_delete"],
+                    qa_suite_create=r_data["qa_suite_create"],
+                    qa_suite_read=r_data["qa_suite_read"],
+                    qa_suite_update=r_data["qa_suite_update"],
+                    qa_suite_delete=r_data["qa_suite_delete"]
+                )
+                db.add(new_role)
         db.commit()
+
+        # --- Seed Default Admin User ---
+        admin_email = "admin@paramount.com"
+        existing_admin = db.query(models.User).filter(models.User.email == admin_email).first()
+        if not existing_admin:
+            admin_role = db.query(models.Role).filter(models.Role.name == "Admin").first()
+            hashed_pwd = pwd_context.hash("admin123")
+            
+            default_admin = models.User(
+                first_name="Admin",
+                last_name="System",
+                email=admin_email,
+                hashed_password=hashed_pwd,
+                is_active=True,
+                role_name="Admin",
+                role_id=admin_role.id if admin_role else None
+            )
+            db.add(default_admin)
+            db.commit()
+            
+    except Exception as e:
+        print(f"Startup database seeding error: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
 
 # =====================================================================
 # 🔑 ROLE ENDPOINTS (CRUD)
@@ -185,14 +202,14 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         is_active=user.is_active,
         role_name=user.role_name,
         role_id=role_id
-      )
+    )
     try:
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=f"Failed saving account into SQLite/Postgres: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed saving account into database: {str(e)}")
         
     return new_user
 
