@@ -113,70 +113,69 @@ def setup_default_roles():
 
 @app.post("/login")
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
-    try:
-        clean_email = credentials.email.strip().lower()
-        user = db.query(models.User).filter(models.User.email.ilike(clean_email)).first()
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password."
-            )
+    clean_email = credentials.email.strip().lower()
+    
+    # 1. Fetch user by email
+    user = db.query(models.User).filter(models.User.email.ilike(clean_email)).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password."
+        )
 
-        # Check plain password or hashed
-        is_valid = False
+    # 2. Safe Password Verification (Prevents server crashes)
+    is_valid = False
+    
+    # Check if plain text matches directly
+    if user.hashed_password == credentials.password:
+        is_valid = True
+    else:
         try:
             is_valid = pwd_context.verify(credentials.password, user.hashed_password)
-        except Exception:
-            if user.hashed_password == credentials.password:
-                is_valid = True
-                user.hashed_password = pwd_context.hash(credentials.password)
-                db.commit()
+        except Exception as err:
+            print(f"Password verify exception ignored: {err}")
+            is_valid = False
 
-        if not is_valid and user.hashed_password == credentials.password:
-            is_valid = True
-            user.hashed_password = pwd_context.hash(credentials.password)
-            db.commit()
-
-        if not is_valid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password."
-            )
-
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your account is deactivated."
-            )
-
-        role = db.query(models.Role).filter(models.Role.name == user.role_name).first()
-
-        return {
-            "id": user.id,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "role_name": user.role_name,
-            "permissions": {
-                "project_create": role.project_create if role else False,
-                "project_read": role.project_read if role else True,
-                "project_update": role.project_update if role else False,
-                "project_delete": role.project_delete if role else False,
-                "qa_suite_create": role.qa_suite_create if role else False,
-                "qa_suite_read": role.qa_suite_read if role else True,
-                "qa_suite_update": role.qa_suite_update if role else False,
-                "qa_suite_delete": role.qa_suite_delete if role else False,
-            }
-        }
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        print(f"Login error: {e}")
+    if not is_valid:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Authentication server error: {str(e)}"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password."
         )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is deactivated."
+        )
+
+    role = db.query(models.Role).filter(models.Role.name == user.role_name).first()
+
+    return {
+        "id": user.id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "role_name": user.role_name,
+        "permissions": {
+            "project_create": role.project_create if role else False,
+            "project_read": role.project_read if role else True,
+            "project_update": role.project_update if role else False,
+            "project_delete": role.project_delete if role else False,
+            "qa_suite_create": role.qa_suite_create if role else False,
+            "qa_suite_read": role.qa_suite_read if role else True,
+            "qa_suite_update": role.qa_suite_update if role else False,
+            "qa_suite_delete": role.qa_suite_delete if role else False,
+        }
+    }
+    # except HTTPException as he:
+    #     raise he
+    # except Exception as e:
+    #     print(f"Login error: {e}")
+    #     raise HTTPException(
+    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #         detail=f"Authentication server error: {str(e)}"
+    #     )
 
 
 # =====================================================================
