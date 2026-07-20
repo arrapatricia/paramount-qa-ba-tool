@@ -52,8 +52,8 @@ class QASuite(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
-    description = Column(String, nullable=True)
+    description = Column(String, nullable=True, default="")
     priority = Column(String, default="Medium")
-    suite_type = Column(String, default="Adhoc")
-    jira_ticket = Column(String, nullable=True)
+    suite_type = Column(String, default="Adhoc", nullable=True)
+    jira_ticket = Column(String, default="", nullable=True)
     project_id = Column(Integer, nullable=True)

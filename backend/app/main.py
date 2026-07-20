@@ -324,4 +324,5 @@ def create_qa_suite(payload: dict, db: Session = Depends(get_db)):
         return new_suite
     except Exception as e:
         db.rollback()
+        print(f"Error creating suite: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to create test suite: {str(e)}")
