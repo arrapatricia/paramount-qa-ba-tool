@@ -11,7 +11,7 @@ from .database import engine, Base, get_db
 from . import models, schemas
 
 # 1. Initialize database tables safely without dropping data
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
@@ -314,6 +314,8 @@ def create_qa_suite(payload: dict, db: Session = Depends(get_db)):
             title=payload.get("title"),
             description=payload.get("description", ""),
             priority=payload.get("priority", "Medium"),
+            suite_type=payload.get("suite_type", "Adhoc"),
+            jira_ticket=payload.get("jira_ticket", ""),
             project_id=payload.get("project_id")
         )
         db.add(new_suite)

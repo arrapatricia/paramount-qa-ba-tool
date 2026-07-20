@@ -3,8 +3,9 @@ import Login from './pages/login';
 import UserPortal from './pages/userportal';
 import Projects from './pages/projects';
 import Documentation from './pages/documentation';
+import TestSuites from './pages/testsuites';
 
-// Define the runtime application User object type synced with backend tables
+// Session user object mapping
 interface SessionUser {
   id: number;
   firstName: string;
@@ -28,56 +29,32 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   
-  // Navigation: 'login' | 'projects' | 'users' | 'documentation'
-  const [currentView, setCurrentView] = useState<'login' | 'projects' | 'users' | 'documentation'>('login');
+  // Navigation State
+  const [currentView, setCurrentView] = useState<'login' | 'projects' | 'test-suites' | 'users' | 'documentation'>('login');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
-  // --- Real-time Date and Time State ---
+  // Real-time Date and Time
   const [currentTime, setCurrentTime] = useState(new Date());
-
-  // Logged-in user session state (Populated dynamically on successful authorization)
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
 
-  // Updates the clock every single second
   useEffect(() => {
     if (!isLoggedIn) return;
-
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, [isLoggedIn]);
 
-  // Clock Formatting Helpers
-  const formattedDate = currentTime.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
+  const formattedDate = currentTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formattedTime = currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
-  const formattedTime = currentTime.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  });
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
-
-  // Mock login callback integration mapping permission capabilities dynamically
-const handleLoginSuccess = (userData: any) => {
-    if (!userData) {
-      console.error("No user data passed to handleLoginSuccess");
-      return;
-    }
+  // Handle Login and Default Page Route
+  const handleLoginSuccess = (userData: any) => {
+    if (!userData) return;
 
     setIsLoggedIn(true);
     
-    // Bind the EXACT user that logged in from Railway
-    setCurrentUser({
+    const userPayload: SessionUser = {
       id: userData.id,
       firstName: userData.first_name,
       lastName: userData.last_name,
@@ -94,9 +71,16 @@ const handleLoginSuccess = (userData: any) => {
         qaSuiteUpdate: userData.permissions?.qa_suite_update ?? false,
         qaSuiteDelete: userData.permissions?.qa_suite_delete ?? false,
       }
-    });
+    };
 
-    setCurrentView('projects');
+    setCurrentUser(userPayload);
+
+    // 🎯 QA LANDING PAGE ROUTE: QA Engineers land straight on Test Suites
+    if (userPayload.roleName === 'QA Engineer' || userPayload.permissions.qaSuiteCreate) {
+      setCurrentView('test-suites');
+    } else {
+      setCurrentView('projects');
+    }
   };
 
   const handleLogout = () => {
@@ -116,42 +100,57 @@ const handleLoginSuccess = (userData: any) => {
   return (
     <main className={`${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-[#f8fafc] text-brand-paramount'} min-h-screen font-sans transition-colors duration-300`}>
       
-      {/* Dynamic Navigation Header */}
+      {/* Top Header */}
       <div className="bg-white dark:bg-neutral-cardDark border-b border-slate-100 dark:border-slate-800/80 px-6 py-4 flex justify-between items-center transition-all shadow-sm">
         
-        {/* Brand Name */}
-        <div className="flex items-center space-x-2 cursor-pointer" onClick={() => isLoggedIn && setCurrentView('projects')}>
+        {/* Brand Logo */}
+        <div 
+          className="flex items-center space-x-2 cursor-pointer" 
+          onClick={() => isLoggedIn && setCurrentView(currentUser?.permissions.qaSuiteCreate ? 'test-suites' : 'projects')}
+        >
           <span className="text-lg font-bold tracking-tight text-brand-paramount dark:text-white">
             Paramount Docs
           </span>
           <span className="text-xs text-slate-400">/ Workspace</span>
         </div>
 
-        {/* Global Controls & Dynamic User Widget */}
+        {/* Dynamic Navigation Toolbar */}
         <div className="flex items-center space-x-4">
           {isLoggedIn && currentUser && (
             <>
-              {/* Projects view is accessible if user has at least read rights */}
               {currentUser.permissions.projectRead && (
                 <button 
                   onClick={() => setCurrentView('projects')}
                   className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
                     currentView === 'projects' || currentView === 'documentation'
-                      ? 'bg-brand-paramount text-white' 
+                      ? 'bg-brand-paramount text-white shadow-sm' 
                       : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
                   }`}
                 >
                   Projects Gallery
                 </button>
               )}
+
+              {/* 🧪 Test Suites Tab */}
+              {currentUser.permissions.qaSuiteRead && (
+                <button 
+                  onClick={() => setCurrentView('test-suites')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center space-x-1.5 ${
+                    currentView === 'test-suites'
+                      ? 'bg-brand-paramount text-white shadow-sm' 
+                      : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
+                  }`}
+                >
+                  <span>🧪 Test Suites</span>
+                </button>
+              )}
               
-              {/* Dynamic check for global systems access instead of hardcoded strings */}
               {currentUser.permissions.projectCreate && (
                 <button 
                   onClick={() => setCurrentView('users')}
                   className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
                     currentView === 'users' 
-                      ? 'bg-brand-paramount text-white' 
+                      ? 'bg-brand-paramount text-white shadow-sm' 
                       : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
                   }`}
                 >
@@ -169,11 +168,9 @@ const handleLoginSuccess = (userData: any) => {
             <span>{isDarkMode ? '☀️ Light' : '🌙 Dark'}</span>
           </button>
 
-          {/* 👤 NESTED USER METADATA & LOGOUT PANEL */}
+          {/* User Widget */}
           {isLoggedIn && currentUser && (
             <div className="flex items-center pl-4 border-l border-slate-100 dark:border-slate-800 space-x-3">
-              
-              {/* User Identity & Live Ticking Clock */}
               <div className="text-right flex flex-col justify-center">
                 <span className="text-sm font-extrabold tracking-tight text-brand-paramount dark:text-white">
                   Hi, {currentUser.firstName}!
@@ -183,7 +180,6 @@ const handleLoginSuccess = (userData: any) => {
                 </span>
               </div>
 
-              {/* Contained Logout Button */}
               <button 
                 onClick={handleLogout}
                 className="px-3 py-1.5 rounded-lg border border-red-500/20 hover:border-red-500/50 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all duration-200"
@@ -195,29 +191,23 @@ const handleLoginSuccess = (userData: any) => {
         </div>
       </div>
 
-      {/* Main View Area */}
+      {/* Main Container */}
       <div className="w-full">
         {!isLoggedIn ? (
-          <Login 
-            isDarkMode={isDarkMode} 
-            onLoginSuccess={handleLoginSuccess} 
-          />
+          <Login isDarkMode={isDarkMode} onLoginSuccess={handleLoginSuccess} />
         ) : (
           <>
             {currentView === 'projects' && (
-              <Projects 
-                isDarkMode={isDarkMode} 
-                onOpenProject={handleOpenProject} 
-              />
+              <Projects isDarkMode={isDarkMode} onOpenProject={handleOpenProject} />
+            )}
+            {currentView === 'test-suites' && (
+              <TestSuites isDarkMode={isDarkMode} currentUser={currentUser} />
             )}
             {currentView === 'users' && (
               <UserPortal isDarkMode={isDarkMode} />
             )}
             {currentView === 'documentation' && (
-              <Documentation 
-                isDarkMode={isDarkMode} 
-                onBackToProjects={() => setCurrentView('projects')} 
-              />
+              <Documentation isDarkMode={isDarkMode} onBackToProjects={() => setCurrentView('projects')} />
             )}
           </>
         )}

@@ -54,4 +54,6 @@ class QASuite(Base):
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
     priority = Column(String, default="Medium")
-    project_id = Column(Integer, nullable=True)  # Simple integer, no broken FK reference!
+    suite_type = Column(String, default="Adhoc")
+    jira_ticket = Column(String, nullable=True)
+    project_id = Column(Integer, nullable=True)

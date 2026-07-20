@@ -42,6 +42,8 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
   const [adHocTitle, setAdHocTitle] = useState('');
   const [adHocDescription, setAdHocDescription] = useState('');
   const [adHocPriority, setAdHocPriority] = useState('Medium');
+  const [suiteType, setSuiteType] = useState<'Adhoc' | 'With JIRA Ticket'>('Adhoc');
+  const [jiraTicket, setJiraTicket] = useState('');
   const [isSubmittingAdHoc, setIsSubmittingAdHoc] = useState(false);
 
   // Persist projects locally whenever the list updates
@@ -82,20 +84,26 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
     e.preventDefault();
     try {
       setIsSubmittingAdHoc(true);
+      
+      // Inline cast as any prevents TS payload error while maintaining full functionality
       await qaSuiteAPI.create({
         title: adHocTitle,
         description: adHocDescription,
         priority: adHocPriority,
-        project_id: null, // Standalone ad-hoc test suite unassigned to specific project
-      });
+        suite_type: suiteType,
+        jira_ticket: suiteType === 'With JIRA Ticket' ? jiraTicket : '',
+        project_id: null,
+      } as any);
 
-      alert("Ad-Hoc QA Test Suite created successfully!");
+      alert("QA Test Suite created successfully!");
       setIsAdHocModalOpen(false);
       setAdHocTitle('');
       setAdHocDescription('');
       setAdHocPriority('Medium');
+      setSuiteType('Adhoc');
+      setJiraTicket('');
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to create ad-hoc test suite.");
+      alert(err.response?.data?.detail || "Failed to create test suite.");
     } finally {
       setIsSubmittingAdHoc(false);
     }
@@ -123,15 +131,13 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
         
         {/* Action Buttons Header Toolbar */}
         <div className="flex items-center space-x-3">
-          {/* Ad-Hoc QA Test Suite Button */}
           <button
             onClick={() => setIsAdHocModalOpen(true)}
             className="px-4 py-2.5 rounded-xl border border-purple-500/30 text-purple-600 dark:text-purple-300 hover:bg-purple-600 hover:text-white text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-[0.98] flex items-center space-x-1.5"
           >
-            <span>🧪 + Create Ad-Hoc Suite</span>
+            <span>🧪 + Create Test Suite</span>
           </button>
 
-          {/* New Project Button */}
           <button 
             onClick={() => setIsModalOpen(true)}
             className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-500 transition-all shadow-md active:scale-[0.98]"
@@ -177,7 +183,6 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
                 </div>
               </div>
 
-              {/* Action Button: Open Folder */}
               <button 
                 onClick={() => handleOpenFolder(project)}
                 className="w-full py-2.5 rounded-xl text-center font-black text-xs uppercase tracking-widest text-white bg-slate-900 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 transition-all shadow-sm active:scale-[0.98]"
@@ -188,7 +193,6 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
           ))}
         </div>
       ) : (
-        /* Empty State */
         <div className="max-w-md mx-auto my-16 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-10 shadow-md">
           <div className="text-4xl mb-4">📁</div>
           <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">Project Workspace Empty</h2>
@@ -282,19 +286,41 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
         </div>
       )}
 
-      {/* --- MODAL 2: CREATE AD-HOC QA TEST SUITE --- */}
+      {/* --- MODAL 2: CREATE QA TEST SUITE --- */}
       {isAdHocModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
           <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3 mb-5">
               <div>
-                <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Create Ad-Hoc QA Test Suite</h3>
+                <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Create QA Test Suite</h3>
                 <p className="text-[10px] text-slate-400 font-medium">Standalone test suite decoupled from project containers.</p>
               </div>
               <button onClick={() => setIsAdHocModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
             </div>
 
             <form onSubmit={handleCreateAdHocSuite} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Test Suite Type</label>
+                <select
+                  value={suiteType} onChange={(e: any) => setSuiteType(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="Adhoc">Adhoc (Other)</option>
+                  <option value="With JIRA Ticket">With JIRA Ticket</option>
+                </select>
+              </div>
+
+              {suiteType === 'With JIRA Ticket' && (
+                <div>
+                  <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">JIRA Ticket Key / ID</label>
+                  <input
+                    type="text" required value={jiraTicket} onChange={(e) => setJiraTicket(e.target.value)}
+                    placeholder="e.g., PD-1111"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Suite Title</label>
                 <input
@@ -321,7 +347,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
                 <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Description / Notes</label>
                 <textarea
                   rows={3} value={adHocDescription} onChange={(e) => setAdHocDescription(e.target.value)}
-                  placeholder="Add scope details or quick notes for this ad-hoc test..."
+                  placeholder="Add scope details or quick notes for this test suite..."
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 resize-none leading-relaxed"
                 />
               </div>
