@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 from passlib.context import CryptContext
+from pydantic import BaseModel
 
 # Set up our secure password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -15,7 +16,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
-# 2. Native FastAPI CORS Configuration (Allows Vercel Frontend & Localhost)
+# 2. Native FastAPI CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -29,6 +30,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Login payload schema
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 # 3. Startup Event: Pre-populate standard roles AND default Admin user safely
 @app.on_event("startup")
@@ -98,6 +104,59 @@ def setup_default_roles():
         db.rollback()
     finally:
         db.close()
+
+
+# =====================================================================
+# 🔐 SECURE AUTHENTICATION ENDPOINT
+# =====================================================================
+
+@app.post("/login")
+def login(credentials: LoginRequest, db: Session = Depends(get_db)):
+    clean_email = credentials.email.strip().lower()
+    
+    # 1. Fetch user by email
+    user = db.query(models.User).filter(models.User.email.ilike(clean_email)).first()
+    
+    # 2. Verify existence and hashed password match
+    if not user or not pwd_context.verify(credentials.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password."
+        )
+    
+    # 3. Verify user account status
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been deactivated. Please contact System Admin."
+        )
+
+    # 4. Fetch linked system role and permissions
+    linked_role = db.query(models.Role).filter(models.Role.name == user.role_name).first()
+    if not linked_role or not linked_role.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your assigned security role is inactive or missing from database."
+        )
+
+    # Return authenticated user payload with permissions
+    return {
+        "id": user.id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "role_name": user.role_name,
+        "permissions": {
+            "project_create": linked_role.project_create,
+            "project_read": linked_role.project_read,
+            "project_update": linked_role.project_update,
+            "project_delete": linked_role.project_delete,
+            "qa_suite_create": linked_role.qa_suite_create,
+            "qa_suite_read": linked_role.qa_suite_read,
+            "qa_suite_update": linked_role.qa_suite_update,
+            "qa_suite_delete": linked_role.qa_suite_delete,
+        }
+    }
 
 
 # =====================================================================
