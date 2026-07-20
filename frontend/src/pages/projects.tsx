@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { qaSuiteAPI } from '../services/api';
 
 interface Project {
   id: string;
@@ -27,7 +28,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Form State
+  // New Project Form State
   const [newName, setNewName] = useState('');
   const [newAbout, setNewAbout] = useState('');
   const [newObjectives, setNewObjectives] = useState('');
@@ -35,6 +36,13 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
   const [newDev, setNewDev] = useState('');
   const [newQa, setNewQa] = useState('');
   const [newBa, setNewBa] = useState('');
+
+  // Ad-Hoc QA Test Suite Form State
+  const [isAdHocModalOpen, setIsAdHocModalOpen] = useState(false);
+  const [adHocTitle, setAdHocTitle] = useState('');
+  const [adHocDescription, setAdHocDescription] = useState('');
+  const [adHocPriority, setAdHocPriority] = useState('Medium');
+  const [isSubmittingAdHoc, setIsSubmittingAdHoc] = useState(false);
 
   // Persist projects locally whenever the list updates
   useEffect(() => {
@@ -69,6 +77,30 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
     setNewBa('');
   };
 
+  // Handles standalone / Ad-Hoc QA Test Suite Creation
+  const handleCreateAdHocSuite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSubmittingAdHoc(true);
+      await qaSuiteAPI.create({
+        title: adHocTitle,
+        description: adHocDescription,
+        priority: adHocPriority,
+        project_id: null, // Standalone ad-hoc test suite unassigned to specific project
+      });
+
+      alert("Ad-Hoc QA Test Suite created successfully!");
+      setIsAdHocModalOpen(false);
+      setAdHocTitle('');
+      setAdHocDescription('');
+      setAdHocPriority('Medium');
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Failed to create ad-hoc test suite.");
+    } finally {
+      setIsSubmittingAdHoc(false);
+    }
+  };
+
   // Triggers folder navigation and caches the exact metadata object
   const handleOpenFolder = (project: Project) => {
     localStorage.setItem('qa_ba_current_project', JSON.stringify(project));
@@ -78,8 +110,8 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
   return (
     <div className={`p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
       
-      {/* Directory Header */}
-      <div className="flex justify-between items-center mb-10 max-w-5xl mx-auto">
+      {/* Directory Header & Actions Toolbar */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 max-w-5xl mx-auto">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">
             Projects Directory
@@ -89,14 +121,24 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
           </p>
         </div>
         
-        {projects.length > 0 && (
+        {/* Action Buttons Header Toolbar */}
+        <div className="flex items-center space-x-3">
+          {/* Ad-Hoc QA Test Suite Button */}
+          <button
+            onClick={() => setIsAdHocModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl border border-purple-500/30 text-purple-600 dark:text-purple-300 hover:bg-purple-600 hover:text-white text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-[0.98] flex items-center space-x-1.5"
+          >
+            <span>🧪 + Create Ad-Hoc Suite</span>
+          </button>
+
+          {/* New Project Button */}
           <button 
             onClick={() => setIsModalOpen(true)}
             className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-500 transition-all shadow-md active:scale-[0.98]"
           >
             + New Project
           </button>
-        )}
+        </div>
       </div>
 
       {/* Folders Grid */}
@@ -135,7 +177,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
                 </div>
               </div>
 
-              {/* CLEANED BUTTON: Only one button, perfectly aligned inside the card */}
+              {/* Action Button: Open Folder */}
               <button 
                 onClick={() => handleOpenFolder(project)}
                 className="w-full py-2.5 rounded-xl text-center font-black text-xs uppercase tracking-widest text-white bg-slate-900 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 transition-all shadow-sm active:scale-[0.98]"
@@ -162,7 +204,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
         </div>
       )}
 
-      {/* Modal */}
+      {/* --- MODAL 1: CREATE NEW PROJECT --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
           <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150">
@@ -234,6 +276,69 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
               <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all shadow-md">Save Project</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 2: CREATE AD-HOC QA TEST SUITE --- */}
+      {isAdHocModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3 mb-5">
+              <div>
+                <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Create Ad-Hoc QA Test Suite</h3>
+                <p className="text-[10px] text-slate-400 font-medium">Standalone test suite decoupled from project containers.</p>
+              </div>
+              <button onClick={() => setIsAdHocModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleCreateAdHocSuite} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Suite Title</label>
+                <input
+                  type="text" required value={adHocTitle} onChange={(e) => setAdHocTitle(e.target.value)}
+                  placeholder="e.g., Quick Regression Check - Auth API"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Priority Level</label>
+                <select
+                  value={adHocPriority} onChange={(e) => setAdHocPriority(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="Low">Low Priority</option>
+                  <option value="Medium">Medium Priority</option>
+                  <option value="High">High Priority</option>
+                  <option value="Critical">Critical Priority</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Description / Notes</label>
+                <textarea
+                  rows={3} value={adHocDescription} onChange={(e) => setAdHocDescription(e.target.value)}
+                  placeholder="Add scope details or quick notes for this ad-hoc test..."
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 resize-none leading-relaxed"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-4">
+                <button
+                  type="button" onClick={() => setIsAdHocModalOpen(false)}
+                  className="px-4 py-2 border rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit" disabled={isSubmittingAdHoc}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl transition-all shadow-md disabled:opacity-50"
+                >
+                  {isSubmittingAdHoc ? 'Creating...' : 'Create Suite'}
+                </button>
               </div>
             </form>
           </div>

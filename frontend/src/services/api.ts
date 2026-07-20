@@ -92,3 +92,16 @@ export const noteAPI = {
     return res.data;
   },
 };
+// ==========================================
+// 🧪 QA TEST SUITE API CALLS
+// ==========================================
+export const qaSuiteAPI = {
+  getAll: async () => {
+    const res = await API.get('/qa-suites');
+    return res.data;
+  },
+  create: async (data: { title: string; description: string; priority: string; project_id?: number | null }) => {
+    const res = await API.post('/qa-suites', data);
+    return res.data;
+  },
+};

@@ -46,3 +46,12 @@ class QuickNote(Base):
     author = Column(String, default="Boss", nullable=False)
     text = Column(String, nullable=False)
     timestamp = Column(String, nullable=False)
+
+class QASuite(Base):
+    __tablename__ = "qa_suites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    priority = Column(String, default="Medium")
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True) # Optional for ad-hoc

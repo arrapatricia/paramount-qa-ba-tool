@@ -294,3 +294,28 @@ def delete_note(note_id: int, db: Session = Depends(get_db)):
     db.delete(note)
     db.commit()
     return {"message": "Note deleted successfully"}
+
+# =====================================================================
+# 🧪 QA SUITE ENDPOINTS (Ad-Hoc & Project-Linked)
+# =====================================================================
+
+@app.get("/qa-suites")
+def get_qa_suites(db: Session = Depends(get_db)):
+    return db.query(models.QASuite).order_by(models.QASuite.id.desc()).all()
+
+@app.post("/qa-suites", status_code=status.HTTP_201_CREATED)
+def create_qa_suite(payload: dict, db: Session = Depends(get_db)):
+    try:
+        new_suite = models.QASuite(
+            title=payload.get("title"),
+            description=payload.get("description", ""),
+            priority=payload.get("priority", "Medium"),
+            project_id=payload.get("project_id")  # None for Ad-Hoc suites!
+        )
+        db.add(new_suite)
+        db.commit()
+        db.refresh(new_suite)
+        return new_suite
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to create test suite: {str(e)}")

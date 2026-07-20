@@ -175,16 +175,22 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
     e.preventDefault();
     try {
       if (editingUser) {
-        const updated = await userAPI.update(editingUser.id, {
+        // 1. Send update request to FastAPI backend
+        await userAPI.update(editingUser.id, {
           first_name: usrFirstName,
           last_name: usrLastName,
           email: usrEmail,
           is_active: editingUser.is_active,
           role_name: usrRole,
         });
-        setUsers(users.map(u => (u.id === editingUser.id ? updated : u)));
+
+        // 2. Re-fetch all users directly from Railway DB to ensure live sync
+        const freshUsers = await userAPI.getAll();
+        setUsers(freshUsers);
+
         addLog('User', 'UPDATED', `User profile altered: ${usrFirstName} ${usrLastName} assigned as ${usrRole}.`);
       } else {
+        // Create new user
         const created = await userAPI.create({
           first_name: usrFirstName,
           last_name: usrLastName,
@@ -193,7 +199,11 @@ export default function UserPortal({ isDarkMode }: UserPortalProps) {
           is_active: true,
           role_name: usrRole,
         });
-        setUsers([...users, created]);
+
+        // Re-fetch all users to get full updated list
+        const freshUsers = await userAPI.getAll();
+        setUsers(freshUsers);
+
         addLog('User', 'CREATED', `New account generated: ${usrFirstName} ${usrLastName} assigned role ${usrRole}.`);
       }
       setIsUserModalOpen(false);
