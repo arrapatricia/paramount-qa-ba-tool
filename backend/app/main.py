@@ -16,18 +16,19 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
-# 2. Native FastAPI CORS Configuration
+# 2. Native FastAPI CORS Configuration with Explicit Origins (Fixes CORS preflight drop)
+allowed_origins = [
+    "https://frontend-sigma-topaz-54.vercel.app",
+    "https://frontend-sigma-topaz-54.vercel.app/",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://frontend-sigma-topaz-54.vercel.app",
-        "https://frontend-sigma-topaz-54.vercel.app/",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "*"  # Wildcard fallback to eliminate CORS preflight blocks
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -80,26 +81,26 @@ def setup_default_roles():
                 db.add(new_role)
         db.commit()
 
-        # --- Seed / Reset Default Admin User ---
-        admin_email = "admin@paramount.com"
-        existing_admin = db.query(models.User).filter(models.User.email == admin_email).first()
+        # --- Seed / Reset Default Admin Users (.com and .com.ph) ---
+        admin_emails = ["admin@paramount.com", "admin@paramount.com.ph"]
         hashed_admin_pwd = pwd_context.hash("admin123")
+        admin_role = db.query(models.Role).filter(models.Role.name == "Admin").first()
 
-        if not existing_admin:
-            admin_role = db.query(models.Role).filter(models.Role.name == "Admin").first()
-            default_admin = models.User(
-                first_name="Admin",
-                last_name="System",
-                email=admin_email,
-                hashed_password=hashed_admin_pwd,
-                is_active=True,
-                role_name="Admin",
-                role_id=admin_role.id if admin_role else None
-            )
-            db.add(default_admin)
-        else:
-            # Always ensure admin@paramount.com password is a valid hash of 'admin123'
-            existing_admin.hashed_password = hashed_admin_pwd
+        for a_email in admin_emails:
+            existing_admin = db.query(models.User).filter(models.User.email == a_email).first()
+            if not existing_admin:
+                default_admin = models.User(
+                    first_name="Admin",
+                    last_name="System",
+                    email=a_email,
+                    hashed_password=hashed_admin_pwd,
+                    is_active=True,
+                    role_name="Admin",
+                    role_id=admin_role.id if admin_role else None
+                )
+                db.add(default_admin)
+            else:
+                existing_admin.hashed_password = hashed_admin_pwd
 
         db.commit()
             
@@ -135,7 +136,6 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         # Triggers if DB contains unhashed plain text from old records
         if user.hashed_password == credentials.password:
             is_password_valid = True
-            # Upgrade stored password to secure hash
             user.hashed_password = pwd_context.hash(credentials.password)
             db.commit()
 
