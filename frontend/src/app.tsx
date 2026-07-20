@@ -69,9 +69,14 @@ export default function App() {
 
   // Mock login callback integration mapping permission capabilities dynamically
 const handleLoginSuccess = (userData: any) => {
+    if (!userData) {
+      console.error("No user data passed to handleLoginSuccess");
+      return;
+    }
+
     setIsLoggedIn(true);
     
-    // Bind all dynamically loaded properties from database matching role credentials
+    // Bind the EXACT user that logged in from Railway
     setCurrentUser({
       id: userData.id,
       firstName: userData.first_name,
@@ -80,14 +85,14 @@ const handleLoginSuccess = (userData: any) => {
       roleName: userData.role_name,
       isActive: true,
       permissions: {
-        projectCreate: userData.permissions?.project_create,
-        projectRead: userData.permissions?.project_read,
-        projectUpdate: userData.permissions?.project_update,
-        projectDelete: userData.permissions?.project_delete,
-        qaSuiteCreate: userData.permissions?.qa_suite_create,
-        qaSuiteRead: userData.permissions?.qa_suite_read,
-        qaSuiteUpdate: userData.permissions?.qa_suite_update,
-        qaSuiteDelete: userData.permissions?.qa_suite_delete,
+        projectCreate: userData.permissions?.project_create ?? false,
+        projectRead: userData.permissions?.project_read ?? true,
+        projectUpdate: userData.permissions?.project_update ?? false,
+        projectDelete: userData.permissions?.project_delete ?? false,
+        qaSuiteCreate: userData.permissions?.qa_suite_create ?? false,
+        qaSuiteRead: userData.permissions?.qa_suite_read ?? true,
+        qaSuiteUpdate: userData.permissions?.qa_suite_update ?? false,
+        qaSuiteDelete: userData.permissions?.qa_suite_delete ?? false,
       }
     });
 

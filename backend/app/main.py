@@ -30,10 +30,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3. Startup Event: Pre-populate standard roles with new feature CRUD matrix
+# 3. Startup Event: Pre-populate standard roles AND a default Admin user
 @app.on_event("startup")
 def setup_default_roles():
     db = next(get_db())
+    
+    # --- Seed Default Roles ---
     default_roles = [
         {
             "name": "Admin", 
@@ -49,7 +51,7 @@ def setup_default_roles():
         },
         {
             "name": "QA Engineer", 
-            "is_active": False,
+            "is_active": True,
             "project_create": False, "project_read": True, "project_update": False, "project_delete": False,
             "qa_suite_create": True, "qa_suite_read": True, "qa_suite_update": True, "qa_suite_delete": False
         },
@@ -57,20 +59,28 @@ def setup_default_roles():
     for r_data in default_roles:
         existing = db.query(models.Role).filter(models.Role.name == r_data["name"]).first()
         if not existing:
-            new_role = models.Role(
-                name=r_data["name"],
-                is_active=r_data["is_active"],
-                project_create=r_data["project_create"],
-                project_read=r_data["project_read"],
-                project_update=r_data["project_update"],
-                project_delete=r_data["project_delete"],
-                qa_suite_create=r_data["qa_suite_create"],
-                qa_suite_read=r_data["qa_suite_read"],
-                qa_suite_update=r_data["qa_suite_update"],
-                qa_suite_delete=r_data["qa_suite_delete"]
-            )
+            new_role = models.Role(**r_data)
             db.add(new_role)
     db.commit()
+
+    # --- Seed Default Admin User ---
+    admin_email = "admin@paramount.com"
+    existing_admin = db.query(models.User).filter(models.User.email == admin_email).first()
+    if not existing_admin:
+        admin_role = db.query(models.Role).filter(models.Role.name == "Admin").first()
+        hashed_pwd = pwd_context.hash("admin123")
+        
+        default_admin = models.User(
+            first_name="Admin",
+            last_name="System",
+            email=admin_email,
+            hashed_password=hashed_pwd,
+            is_active=True,
+            role_name="Admin",
+            role_id=admin_role.id if admin_role else None
+        )
+        db.add(default_admin)
+        db.commit()
 
 # =====================================================================
 # 🔑 ROLE ENDPOINTS (CRUD)
