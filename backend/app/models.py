@@ -54,4 +54,4 @@ class QASuite(Base):
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
     priority = Column(String, default="Medium")
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True) # Optional for ad-hoc
+    project_id = Column(Integer, nullable=True)  # Simple integer, no broken FK reference!

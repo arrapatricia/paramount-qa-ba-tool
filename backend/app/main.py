@@ -301,7 +301,11 @@ def delete_note(note_id: int, db: Session = Depends(get_db)):
 
 @app.get("/qa-suites")
 def get_qa_suites(db: Session = Depends(get_db)):
-    return db.query(models.QASuite).order_by(models.QASuite.id.desc()).all()
+    try:
+        return db.query(models.QASuite).order_by(models.QASuite.id.desc()).all()
+    except Exception as e:
+        print(f"Error fetching QA suites: {e}")
+        return []
 
 @app.post("/qa-suites", status_code=status.HTTP_201_CREATED)
 def create_qa_suite(payload: dict, db: Session = Depends(get_db)):
@@ -310,7 +314,7 @@ def create_qa_suite(payload: dict, db: Session = Depends(get_db)):
             title=payload.get("title"),
             description=payload.get("description", ""),
             priority=payload.get("priority", "Medium"),
-            project_id=payload.get("project_id")  # None for Ad-Hoc suites!
+            project_id=payload.get("project_id")
         )
         db.add(new_suite)
         db.commit()
