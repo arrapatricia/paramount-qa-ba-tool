@@ -1,64 +1,76 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-# Set up our secure password hashing context
+# Safe password context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 from .database import engine, Base, get_db
 from . import models, schemas
 
-# 1. Initialize database tables automatically on server startup
+# Initialize tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
 
-# 2. Native FastAPI CORS Configuration with Explicit Origins (Fixes CORS preflight drop)
-allowed_origins = [
-    "https://frontend-sigma-topaz-54.vercel.app",
-    "https://frontend-sigma-topaz-54.vercel.app/",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-
+# 1. Broad Cors Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_origins=["*"],
+    allow_credentials=False,  # Set to False when using allow_origins=["*"] to prevent browser preflight rejects
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Login payload schema
+# 2. Global Exception Catch-All to guarantee CORS headers on ANY error
+@app.middleware("http")
+async def add_cors_header(request: Request, call_next):
+    if request.method == "OPTIONS":
+        response = JSONResponse(status_code=200, content={"message": "OK"})
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+
+    try:
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        return response
+    except Exception as exc:
+        print(f"Server Exception: {exc}")
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": f"Internal Server Error: {str(exc)}"}
+        )
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        return response
+
 class LoginRequest(BaseModel):
     email: str
     password: str
 
-# 3. Startup Event: Pre-populate standard roles AND default Admin user safely
+
 @app.on_event("startup")
 def setup_default_roles():
-    db = next(get_db())
     try:
-        # --- Seed Default System Roles ---
+        db = next(get_db())
         default_roles = [
             {
-                "name": "Admin", 
-                "is_active": True,
+                "name": "Admin", "is_active": True,
                 "project_create": True, "project_read": True, "project_update": True, "project_delete": True,
                 "qa_suite_create": True, "qa_suite_read": True, "qa_suite_update": True, "qa_suite_delete": True
             },
             {
-                "name": "Business Analyst", 
-                "is_active": True,
+                "name": "Business Analyst", "is_active": True,
                 "project_create": True, "project_read": True, "project_update": True, "project_delete": False,
                 "qa_suite_create": False, "qa_suite_read": True, "qa_suite_update": False, "qa_suite_delete": False
             },
             {
-                "name": "QA Engineer", 
-                "is_active": True,
+                "name": "QA Engineer", "is_active": True,
                 "project_create": False, "project_read": True, "project_update": False, "project_delete": False,
                 "qa_suite_create": True, "qa_suite_read": True, "qa_suite_update": True, "qa_suite_delete": False
             },
@@ -66,127 +78,109 @@ def setup_default_roles():
         for r_data in default_roles:
             existing = db.query(models.Role).filter(models.Role.name == r_data["name"]).first()
             if not existing:
-                new_role = models.Role(
-                    name=r_data["name"],
-                    is_active=r_data["is_active"],
-                    project_create=r_data["project_create"],
-                    project_read=r_data["project_read"],
-                    project_update=r_data["project_update"],
-                    project_delete=r_data["project_delete"],
-                    qa_suite_create=r_data["qa_suite_create"],
-                    qa_suite_read=r_data["qa_suite_read"],
-                    qa_suite_update=r_data["qa_suite_update"],
-                    qa_suite_delete=r_data["qa_suite_delete"]
-                )
-                db.add(new_role)
+                db.add(models.Role(**r_data))
         db.commit()
 
-        # --- Seed / Reset Default Admin Users (.com and .com.ph) ---
-        admin_emails = ["admin@paramount.com", "admin@paramount.com.ph"]
-        hashed_admin_pwd = pwd_context.hash("admin123")
+        # Seed Default Admins
         admin_role = db.query(models.Role).filter(models.Role.name == "Admin").first()
+        admin_emails = ["admin@paramount.com", "admin@paramount.com.ph"]
+        hashed_pwd = pwd_context.hash("admin123")
 
-        for a_email in admin_emails:
-            existing_admin = db.query(models.User).filter(models.User.email == a_email).first()
-            if not existing_admin:
-                default_admin = models.User(
+        for email_addr in admin_emails:
+            existing_user = db.query(models.User).filter(models.User.email == email_addr).first()
+            if not existing_user:
+                db.add(models.User(
                     first_name="Admin",
                     last_name="System",
-                    email=a_email,
-                    hashed_password=hashed_admin_pwd,
+                    email=email_addr,
+                    hashed_password=hashed_pwd,
                     is_active=True,
                     role_name="Admin",
                     role_id=admin_role.id if admin_role else None
-                )
-                db.add(default_admin)
+                ))
             else:
-                existing_admin.hashed_password = hashed_admin_pwd
+                existing_user.hashed_password = hashed_pwd
 
         db.commit()
-            
-    except Exception as e:
-        print(f"Startup database seeding error: {e}")
-        db.rollback()
-    finally:
         db.close()
+    except Exception as e:
+        print(f"Startup error ignored: {e}")
 
 
 # =====================================================================
-# 🔐 SECURE AUTHENTICATION ENDPOINT
+# 🔐 FAILSAFE AUTHENTICATION ENDPOINT
 # =====================================================================
 
 @app.post("/login")
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
-    clean_email = credentials.email.strip().lower()
-    
-    # 1. Fetch user by email
-    user = db.query(models.User).filter(models.User.email.ilike(clean_email)).first()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password."
-        )
-
-    # 2. Flexible password verification with legacy plain-text fallback & auto-upgrade
-    is_password_valid = False
     try:
-        is_password_valid = pwd_context.verify(credentials.password, user.hashed_password)
-    except Exception:
-        # Triggers if DB contains unhashed plain text from old records
-        if user.hashed_password == credentials.password:
-            is_password_valid = True
+        clean_email = credentials.email.strip().lower()
+        user = db.query(models.User).filter(models.User.email.ilike(clean_email)).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid username or password."
+            )
+
+        # Check plain password or hashed
+        is_valid = False
+        try:
+            is_valid = pwd_context.verify(credentials.password, user.hashed_password)
+        except Exception:
+            if user.hashed_password == credentials.password:
+                is_valid = True
+                user.hashed_password = pwd_context.hash(credentials.password)
+                db.commit()
+
+        if not is_valid and user.hashed_password == credentials.password:
+            is_valid = True
             user.hashed_password = pwd_context.hash(credentials.password)
             db.commit()
 
-    if not is_password_valid and user.hashed_password == credentials.password:
-        is_password_valid = True
-        user.hashed_password = pwd_context.hash(credentials.password)
-        db.commit()
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid username or password."
+            )
 
-    if not is_password_valid:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password."
-        )
-    
-    # 3. Verify user account status
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account has been deactivated. Please contact System Admin."
-        )
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account is deactivated."
+            )
 
-    # 4. Fetch linked system role and permissions
-    linked_role = db.query(models.Role).filter(models.Role.name == user.role_name).first()
-    if not linked_role or not linked_role.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your assigned security role is inactive or missing from database."
-        )
+        role = db.query(models.Role).filter(models.Role.name == user.role_name).first()
 
-    # Return authenticated user payload with permissions
-    return {
-        "id": user.id,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "email": user.email,
-        "role_name": user.role_name,
-        "permissions": {
-            "project_create": linked_role.project_create,
-            "project_read": linked_role.project_read,
-            "project_update": linked_role.project_update,
-            "project_delete": linked_role.project_delete,
-            "qa_suite_create": linked_role.qa_suite_create,
-            "qa_suite_read": linked_role.qa_suite_read,
-            "qa_suite_update": linked_role.qa_suite_update,
-            "qa_suite_delete": linked_role.qa_suite_delete,
+        return {
+            "id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "role_name": user.role_name,
+            "permissions": {
+                "project_create": role.project_create if role else False,
+                "project_read": role.project_read if role else True,
+                "project_update": role.project_update if role else False,
+                "project_delete": role.project_delete if role else False,
+                "qa_suite_create": role.qa_suite_create if role else False,
+                "qa_suite_read": role.qa_suite_read if role else True,
+                "qa_suite_update": role.qa_suite_update if role else False,
+                "qa_suite_delete": role.qa_suite_delete if role else False,
+            }
         }
-    }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Login error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Authentication server error: {str(e)}"
+        )
 
 
 # =====================================================================
-# 🔑 ROLE ENDPOINTS (CRUD)
+# 🔑 ROLE ENDPOINTS
 # =====================================================================
 
 @app.get("/roles", response_model=List[schemas.Role])
@@ -199,18 +193,7 @@ def create_role(role: schemas.RoleCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Role name already exists")
     
-    new_role = models.Role(
-        name=role.name,
-        is_active=role.is_active,
-        project_create=role.project_create,
-        project_read=role.project_read,
-        project_update=role.project_update,
-        project_delete=role.project_delete,
-        qa_suite_create=role.qa_suite_create,
-        qa_suite_read=role.qa_suite_read,
-        qa_suite_update=role.qa_suite_update,
-        qa_suite_delete=role.qa_suite_delete
-    )
+    new_role = models.Role(**role.dict())
     db.add(new_role)
     db.commit()
     db.refresh(new_role)
@@ -222,26 +205,11 @@ def update_role(role_id: int, updated_role: schemas.RoleCreate, db: Session = De
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
     
-    role.name = updated_role.name
-    role.is_active = updated_role.is_active
+    for key, value in updated_role.dict().items():
+        setattr(role, key, value)
     
-    role.project_create = updated_role.project_create
-    role.project_read = updated_role.project_read
-    role.project_update = updated_role.project_update
-    role.project_delete = updated_role.project_delete
-    
-    role.qa_suite_create = updated_role.qa_suite_create
-    role.qa_suite_read = updated_role.qa_suite_read
-    role.qa_suite_update = updated_role.qa_suite_update
-    role.qa_suite_delete = updated_role.qa_suite_delete
-    
-    try:
-        db.commit()
-        db.refresh(role)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=f"Database commit failed: {str(e)}")
-        
+    db.commit()
+    db.refresh(role)
     return role
 
 @app.delete("/roles/{role_id}")
@@ -249,7 +217,6 @@ def delete_role(role_id: int, db: Session = Depends(get_db)):
     role = db.query(models.Role).filter(models.Role.id == role_id).first()
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
-    
     if role.name in ["Admin", "Business Analyst", "QA Engineer"]:
         raise HTTPException(status_code=400, detail="System Default roles cannot be deleted!")
         
@@ -259,7 +226,7 @@ def delete_role(role_id: int, db: Session = Depends(get_db)):
 
 
 # =====================================================================
-# 👤 USER ENDPOINTS (CRUD & Security)
+# 👤 USER ENDPOINTS
 # =====================================================================
 
 @app.get("/users", response_model=List[schemas.User])
@@ -274,11 +241,9 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     role = db.query(models.Role).filter(models.Role.name == user.role_name).first()
     if not role:
-        raise HTTPException(status_code=404, detail=f"Assigned system security role '{user.role_name}' does not exist inside the backend tables yet! Configure it first.")
+        raise HTTPException(status_code=404, detail=f"Role '{user.role_name}' does not exist.")
         
-    role_id = role.id
     hashed_pwd = pwd_context.hash(user.password)
-
     new_user = models.User(
         first_name=user.first_name,
         last_name=user.last_name,
@@ -286,16 +251,11 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         hashed_password=hashed_pwd,
         is_active=user.is_active,
         role_name=user.role_name,
-        role_id=role_id
+        role_id=role.id
     )
-    try:
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=f"Failed saving account into database: {str(e)}")
-        
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
     return new_user
 
 @app.put("/users/{user_id}", response_model=schemas.User)
@@ -305,15 +265,14 @@ def update_user(user_id: int, updated_user: schemas.UserBase, db: Session = Depe
         raise HTTPException(status_code=404, detail="User not found")
     
     role = db.query(models.Role).filter(models.Role.name == updated_user.role_name).first()
-    if not role:
-        raise HTTPException(status_code=404, detail=f"Assigned system security role '{updated_user.role_name}' does not exist inside the backend tables yet!")
     
     user.first_name = updated_user.first_name
     user.last_name = updated_user.last_name
     user.email = updated_user.email
     user.is_active = updated_user.is_active
     user.role_name = updated_user.role_name
-    user.role_id = role.id
+    if role:
+        user.role_id = role.id
 
     db.commit()
     db.refresh(user)
@@ -352,7 +311,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
 
 
 # =====================================================================
-# 💬 PERSISTENT NOTES ENDPOINTS
+# 💬 NOTES ENDPOINTS
 # =====================================================================
 
 @app.get("/notes", response_model=List[schemas.QuickNote])
@@ -361,11 +320,7 @@ def get_notes(db: Session = Depends(get_db)):
 
 @app.post("/notes", response_model=schemas.QuickNote, status_code=status.HTTP_201_CREATED)
 def create_note(note: schemas.QuickNoteCreate, db: Session = Depends(get_db)):
-    new_note = models.QuickNote(
-        author=note.author,
-        text=note.text,
-        timestamp=note.timestamp
-    )
+    new_note = models.QuickNote(author=note.author, text=note.text, timestamp=note.timestamp)
     db.add(new_note)
     db.commit()
     db.refresh(new_note)
@@ -380,8 +335,9 @@ def delete_note(note_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Note deleted successfully"}
 
+
 # =====================================================================
-# 🧪 QA SUITE ENDPOINTS (Ad-Hoc & Project-Linked)
+# 🧪 QA SUITE ENDPOINTS
 # =====================================================================
 
 @app.get("/qa-suites")
@@ -409,5 +365,4 @@ def create_qa_suite(payload: dict, db: Session = Depends(get_db)):
         return new_suite
     except Exception as e:
         db.rollback()
-        print(f"Error creating suite: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to create test suite: {str(e)}")
