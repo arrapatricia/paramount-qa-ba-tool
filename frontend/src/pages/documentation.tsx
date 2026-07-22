@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
-import logoDocs from '../assets/logo_docs.png'; 
-import QaTestSuite from '../components/qatestsuite'; 
+import logoDocs from '../assets/logo_docs.png';
+import QaTestSuite from '../components/qatestsuite';
 
 // --- TYPES & INTERFACES ---
 interface DocPage {
@@ -9,9 +9,21 @@ interface DocPage {
   content: string;
 }
 
+interface TestCase {
+  id: string;
+  description: string;
+  preconditions: string;
+  expectedResult: string;
+  status: 'PASSED' | 'FAILED' | 'PENDING';
+  assignedQa?: string;
+  attachments?: { name: string; url: string }[];
+}
+
 interface QaSuiteItem {
   id: string;
   title: string;
+  jiraTicket?: string;
+  testCases: TestCase[];
 }
 
 interface ProjectSpecs {
@@ -29,7 +41,7 @@ interface ProjectSpecs {
 interface DocumentationProps {
   isDarkMode: boolean;
   onBackToProjects: () => void;
-  selectedProject?: any; 
+  selectedProject?: any;
 }
 
 const DEFAULT_PROJECT_SPECS: ProjectSpecs = {
@@ -64,7 +76,6 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
       };
     }
     
-    // Fallback if accessed out of order
     return {
       name: selectedProject?.name || DEFAULT_PROJECT_SPECS.name,
       description: selectedProject?.about || DEFAULT_PROJECT_SPECS.description,
@@ -78,12 +89,29 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
     };
   });
 
-  // Dynamic user mapping for auditing logs
   const currentUser = projectSpecs.baAssigned !== "Unassigned" ? projectSpecs.baAssigned : "System User";
 
-  // Document states
+  // Document & QA Suite states
   const [pages, setPages] = useState<DocPage[]>([]);
-  const [qaSuites, setQaSuites] = useState<QaSuiteItem[]>([]);
+  const [qaSuites, setQaSuites] = useState<QaSuiteItem[]>([
+    {
+      id: 'suite-default-1',
+      title: 'PD Application Form',
+      jiraTicket: 'ASPD-211',
+      testCases: [
+        { id: 'TEST-001', description: 'Validate input fields', preconditions: '—', expectedResult: 'Success', status: 'FAILED' },
+        { id: 'TEST-002', description: 'Submit policy form', preconditions: '—', expectedResult: 'Policy generated', status: 'PASSED' },
+        { id: 'TEST-003', description: 'Payment processing endpoint', preconditions: '—', expectedResult: '200 OK', status: 'PASSED', attachments: [{ name: 'Logo.bmp', url: '#' }] },
+        { id: 'TEST-004', description: 'Database audit record sync', preconditions: '—', expectedResult: 'Audit created', status: 'PASSED', attachments: [{ name: 'Code_xuw5Fk.png', url: '#' }] },
+      ]
+    }
+  ]);
+
+  // Form states for creating test cases inside embedded suites
+  const [tcDescription, setTcDescription] = useState('');
+  const [tcPreconditions, setTcPreconditions] = useState('');
+  const [tcExpectedResult, setTcExpectedResult] = useState('');
+  const [tcStatus, setTcStatus] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PENDING');
 
   // Editor states
   const [editorMode, setEditorMode] = useState<'visual' | 'code'>('visual');
@@ -94,7 +122,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
   const [notes, setNotes] = useState<string>('');
   const [isAiPanelOpen, setIsAiPanelOpen] = useState<boolean>(true);
 
-  // Word Tags State
+  // Tags State
   const [wordTags, setWordTags] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState<string>('');
 
@@ -131,10 +159,64 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
     e.preventDefault();
     if (!newQaSuiteTitle.trim()) return;
     const newId = `qa-suite-${Date.now()}`;
-    setQaSuites(prev => [...prev, { id: newId, title: newQaSuiteTitle }]);
+    setQaSuites(prev => [...prev, {
+      id: newId,
+      title: newQaSuiteTitle,
+      jiraTicket: `JIRA-${Math.floor(100 + Math.random() * 900)}`,
+      testCases: []
+    }]);
     setNewQaSuiteTitle('');
     logAudit(`Added QA Test Suite: "${newQaSuiteTitle}"`);
     setTimeout(() => scrollToSection(newId), 100);
+  };
+
+  const handleAddTestCaseToSuite = (suiteId: string) => {
+    if (!tcDescription.trim()) return;
+    setQaSuites(prev => prev.map(suite => {
+      if (suite.id === suiteId) {
+        const newCase: TestCase = {
+          id: `TEST-00${suite.testCases.length + 1}`,
+          description: tcDescription,
+          preconditions: tcPreconditions || '—',
+          expectedResult: tcExpectedResult || '—',
+          status: tcStatus,
+        };
+        return { ...suite, testCases: [...suite.testCases, newCase] };
+      }
+      return suite;
+    }));
+
+    logAudit(`Added test case to suite.`);
+    setTcDescription('');
+    setTcPreconditions('');
+    setTcExpectedResult('');
+    setTcStatus('PENDING');
+  };
+
+  const handleStatusChange = (suiteId: string, caseId: string, newStatus: 'PASSED' | 'FAILED' | 'PENDING') => {
+    setQaSuites(prev => prev.map(suite => {
+      if (suite.id === suiteId) {
+        return {
+          ...suite,
+          testCases: suite.testCases.map(c => c.id === caseId ? { ...c, status: newStatus } : c)
+        };
+      }
+      return suite;
+    }));
+    logAudit(`Updated test case status to ${newStatus}`);
+  };
+
+  const handleDeleteTestCase = (suiteId: string, caseId: string) => {
+    setQaSuites(prev => prev.map(suite => {
+      if (suite.id === suiteId) {
+        return {
+          ...suite,
+          testCases: suite.testCases.filter(c => c.id !== caseId)
+        };
+      }
+      return suite;
+    }));
+    logAudit(`Deleted test case ${caseId}`);
   };
 
   const updateSpecField = (field: keyof ProjectSpecs, value: string) => {
@@ -200,7 +282,6 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
     if (!rowsInput || !colsInput) return;
     const rows = parseInt(rowsInput);
     const cols = parseInt(colsInput);
-    
     if (isNaN(rows) || isNaN(cols)) return;
 
     let tableHTML = `<table style="width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 11px; border: 1px solid #cbd5e1;">`;
@@ -481,7 +562,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
           </div>
         )}
 
-        {/* Center: Work Canvas */}
+        {/* Center Work Canvas */}
         <div className="flex-1 flex flex-col bg-slate-100/50 dark:bg-neutral-obsidian/20 overflow-y-auto">
           
           {editorMode === 'visual' && (
@@ -522,7 +603,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
             <span>Highlight text to apply font or styling settings above</span>
           </div>
 
-          <div className="p-8 max-w-4xl w-full mx-auto space-y-8 flex-1">
+          <div className="p-8 max-w-5xl w-full mx-auto space-y-8 flex-1">
             {pages.map((p) => (
               <div 
                 key={p.id} 
@@ -553,22 +634,227 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
               </div>
             ))}
 
-            {/* QA Test Suites Render */}
-            {qaSuites.map((suite) => (
-              <div 
-                key={suite.id}
-                id={suite.id}
-                ref={el => { sectionRefs.current[suite.id] = el; }}
-                className="scroll-mt-6"
-              >
-                <QaTestSuite 
-                  suiteId={suite.id}
-                  suiteTitle={suite.title}
-                  projectName={projectSpecs.name}
-                  onLogAudit={logAudit} 
-                />
-              </div>
-            ))}
+            {/* QA Test Suites Render - Full Detailed View Matching Standalone Page */}
+            {qaSuites.map((suite) => {
+              const totalCases = suite.testCases.length;
+              const passedCases = suite.testCases.filter(c => c.status === 'PASSED').length;
+              const failedCases = suite.testCases.filter(c => c.status === 'FAILED').length;
+              const passRate = totalCases > 0 ? Math.round((passedCases / totalCases) * 100) : 0;
+
+              return (
+                <div 
+                  key={suite.id}
+                  id={suite.id}
+                  ref={el => { sectionRefs.current[suite.id] = el; }}
+                  className="scroll-mt-6 space-y-6"
+                >
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    
+                    {/* Left Sidebar Suite Info Card */}
+                    <div className="space-y-4">
+                      <div className="bg-white dark:bg-neutral-cardDark p-5 rounded-2xl border border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-amber-500/10 text-amber-500">
+                            WITH JIRA TICKET
+                          </span>
+                          <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-red-500/10 text-red-500">
+                            HIGH
+                          </span>
+                        </div>
+
+                        <h2 className="text-xl font-black text-slate-800 dark:text-white">
+                          {suite.title}
+                        </h2>
+
+                        <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+                          <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500">
+                            JIRA: {suite.jiraTicket || 'ASPD-211'} ↗
+                          </span>
+                          <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">
+                            Project: {projectSpecs.name}
+                          </span>
+                          <span className="px-2 py-1 rounded bg-purple-500/10 text-purple-400">
+                            QA: {projectSpecs.qaAssignee}
+                          </span>
+                        </div>
+
+                        <div className="pt-2 space-y-2">
+                          <button className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase transition-all cursor-pointer">
+                            EDIT SUITE SPECS
+                          </button>
+                          <button className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md cursor-pointer">
+                            AUTO-GENERATE TEST REPORT
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Attachments Gallery */}
+                      <div className="bg-white dark:bg-neutral-cardDark p-5 rounded-2xl border border-slate-200 dark:border-neutral-800 space-y-3 shadow-sm">
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                          ATTACHMENTS GALLERY ({suite.testCases.flatMap(c => c.attachments || []).length})
+                        </h3>
+                        <div className="space-y-2">
+                          {suite.testCases
+                            .flatMap(c => (c.attachments || []).map(att => ({ ...att, caseId: c.id })))
+                            .map((file, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-xs p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                                <span className="font-mono text-[10px] text-blue-500 font-bold truncate max-w-[100px]">
+                                  {file.caseId}: {file.name}
+                                </span>
+                                <div className="space-x-1">
+                                  <button className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-bold">Preview</button>
+                                  <button className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold">Download</button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Main Column */}
+                    <div className="lg:col-span-3 space-y-6">
+                      
+                      {/* Stats Bar */}
+                      <div className="grid grid-cols-4 gap-4">
+                        <div className="bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200 dark:border-neutral-800 text-center">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">TOTAL CASES</span>
+                          <span className="text-2xl font-black text-slate-800 dark:text-white">{totalCases}</span>
+                        </div>
+                        <div className="bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200 dark:border-neutral-800 text-center">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 block">PASSED</span>
+                          <span className="text-2xl font-black text-emerald-500">{passedCases}</span>
+                        </div>
+                        <div className="bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200 dark:border-neutral-800 text-center">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-red-500 block">FAILED</span>
+                          <span className="text-2xl font-black text-red-500">{failedCases}</span>
+                        </div>
+                        <div className="bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200 dark:border-neutral-800 text-center">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-blue-500 block">PASS RATE</span>
+                          <span className="text-2xl font-black text-blue-500">{passRate}%</span>
+                        </div>
+                      </div>
+
+                      {/* Add New Test Case Form */}
+                      <div className="bg-white dark:bg-neutral-cardDark p-6 rounded-2xl border border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                          ADD NEW TEST CASE
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <input
+                            type="text"
+                            placeholder="Description..."
+                            value={tcDescription}
+                            onChange={(e) => setTcDescription(e.target.value)}
+                            className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white outline-none"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Preconditions..."
+                            value={tcPreconditions}
+                            onChange={(e) => setTcPreconditions(e.target.value)}
+                            className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white outline-none"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Expected Result..."
+                            value={tcExpectedResult}
+                            onChange={(e) => setTcExpectedResult(e.target.value)}
+                            className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white outline-none"
+                          />
+                          <select
+                            value={tcStatus}
+                            onChange={(e: any) => setTcStatus(e.target.value)}
+                            className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-bold outline-none cursor-pointer"
+                          >
+                            <option value="PENDING">PENDING</option>
+                            <option value="PASSED">PASSED</option>
+                            <option value="FAILED">FAILED</option>
+                          </select>
+                        </div>
+
+                        {/* File Dropzone */}
+                        <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center space-y-1 hover:border-blue-500 transition-all cursor-pointer">
+                          <p className="text-xs font-bold text-blue-500">
+                            Drag and drop screenshot/video files here, or click to browse
+                          </p>
+                          <p className="text-[10px] text-slate-400">Supported formats: PNG, JPG, MP4, WebM</p>
+                        </div>
+
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleAddTestCaseToSuite(suite.id)}
+                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md cursor-pointer"
+                          >
+                            + ADD TEST CASE
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Test Cases Table */}
+                      <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200 dark:border-neutral-800 overflow-hidden shadow-sm">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-[10px] uppercase font-black text-slate-400">
+                            <tr>
+                              <th className="p-4">TEST CASE ID</th>
+                              <th className="p-4">DESCRIPTION</th>
+                              <th className="p-4">PRECONDITIONS</th>
+                              <th className="p-4">EXPECTED RESULT</th>
+                              <th className="p-4">ATTACHMENTS</th>
+                              <th className="p-4">STATUS</th>
+                              <th className="p-4 text-right">ACTIONS</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                            {suite.testCases.map((tc) => (
+                              <tr key={tc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
+                                <td className="p-4 font-mono font-bold text-blue-500">{tc.id}</td>
+                                <td className="p-4 font-bold text-slate-800 dark:text-white">{tc.description}</td>
+                                <td className="p-4 text-slate-400">{tc.preconditions}</td>
+                                <td className="p-4 text-slate-700 dark:text-slate-300">{tc.expectedResult}</td>
+                                <td className="p-4">
+                                  {tc.attachments && tc.attachments.length > 0 ? (
+                                    <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-blue-400">
+                                      {tc.attachments[0].name} +
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 italic text-[10px]">None</span>
+                                  )}
+                                </td>
+                                <td className="p-4">
+                                  <select
+                                    value={tc.status}
+                                    onChange={(e: any) => handleStatusChange(suite.id, tc.id, e.target.value)}
+                                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase outline-none cursor-pointer ${
+                                      tc.status === 'PASSED'
+                                        ? 'bg-emerald-500/10 text-emerald-500'
+                                        : tc.status === 'FAILED'
+                                        ? 'bg-red-500/10 text-red-500'
+                                        : 'bg-amber-500/10 text-amber-500'
+                                    }`}
+                                  >
+                                    <option value="PASSED">PASSED</option>
+                                    <option value="FAILED">FAILED</option>
+                                    <option value="PENDING">PENDING</option>
+                                  </select>
+                                </td>
+                                <td className="p-4 text-right space-x-2">
+                                  <button className="text-amber-500 hover:underline font-bold text-[10px] uppercase">Edit</button>
+                                  <button onClick={() => handleDeleteTestCase(suite.id, tc.id)} className="text-red-500 hover:underline font-bold text-[10px] uppercase">Delete</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })}
 
             {pages.length === 0 && qaSuites.length === 0 && (
               <div className="bg-white dark:bg-neutral-cardDark border border-dashed border-slate-200 dark:border-slate-700/80 rounded-xl p-16 text-center shadow-sm">
