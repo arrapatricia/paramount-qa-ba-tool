@@ -4,6 +4,7 @@ import UserPortal from './pages/userportal';
 import Projects from './pages/projects';
 import Documentation from './pages/documentation';
 import TestSuites from './pages/testsuites';
+import SystemsDirectory from './pages/systems';
 
 // Session user object mapping
 interface SessionUser {
@@ -30,8 +31,8 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   
-  // Navigation State
-  const [currentView, setCurrentView] = useState<'login' | 'projects' | 'test-suites' | 'users' | 'documentation'>('login');
+  // Navigation State (Includes 'systems' as the primary homepage)
+  const [currentView, setCurrentView] = useState<'login' | 'systems' | 'projects' | 'test-suites' | 'users' | 'documentation'>('login');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   // Real-time Date and Time
@@ -80,12 +81,8 @@ export default function App() {
 
     setCurrentUser(userPayload);
 
-    // 🎯 ROUTE PER ROLE: QA goes to Test Suites, all others go straight to Projects
-    if (userPayload.roleName === 'QA Engineer') {
-      setCurrentView('test-suites');
-    } else {
-      setCurrentView('projects');
-    }
+    // Default Landing View for All Users upon logging in
+    setCurrentView('systems');
   };
 
   const handleLogout = () => {
@@ -108,12 +105,12 @@ export default function App() {
       {/* Top Header */}
       <div className="bg-white dark:bg-neutral-cardDark border-b border-slate-100 dark:border-slate-800/80 px-6 py-4 flex justify-between items-center transition-all shadow-sm">
         
-        {/* Brand Logo */}
+        {/* Brand Logo - Clicking Paramount Docs lands on Systems Directory for all users */}
         <div 
-          className="flex items-center space-x-2 cursor-pointer" 
-          onClick={() => isLoggedIn && setCurrentView(currentUser?.roleName === 'QA Engineer' ? 'test-suites' : 'projects')}
+          className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-all" 
+          onClick={() => isLoggedIn && setCurrentView('systems')}
         >
-          <span className="text-lg font-bold tracking-tight text-brand-paramount dark:text-white">
+          <span className="text-lg font-bold tracking-tight text-blue-600 dark:text-white">
             Paramount Docs
           </span>
           <span className="text-xs text-slate-400">/ Workspace</span>
@@ -123,6 +120,18 @@ export default function App() {
         <div className="flex items-center space-x-4">
           {isLoggedIn && currentUser && (
             <>
+              {/* Systems Directory Tab */}
+              <button 
+                onClick={() => setCurrentView('systems')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  currentView === 'systems'
+                    ? 'bg-brand-paramount text-white shadow-sm' 
+                    : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
+                }`}
+              >
+                Systems Directory
+              </button>
+
               {currentUser.permissions.projectRead && (
                 <button 
                   onClick={() => setCurrentView('projects')}
@@ -136,21 +145,21 @@ export default function App() {
                 </button>
               )}
 
-              {/* 🧪 Test Suites Tab */}
+              {/* Test Suites Tab */}
               {currentUser.permissions.qaSuiteRead && (
                 <button 
                   onClick={() => setCurrentView('test-suites')}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center space-x-1.5 cursor-pointer ${
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     currentView === 'test-suites'
                       ? 'bg-brand-paramount text-white shadow-sm' 
                       : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
                   }`}
                 >
-                  <span>🧪 Test Suites</span>
+                  Test Suites
                 </button>
               )}
               
-              {/* 🔒 MANAGE USERS TAB: EXCLUSIVELY FOR ADMIN ROLE */}
+              {/* Manage Users Tab: Exclusively for Admin */}
               {isAdmin && (
                 <button 
                   onClick={() => setCurrentView('users')}
@@ -171,7 +180,7 @@ export default function App() {
             onClick={toggleTheme}
             className="flex items-center space-x-1.5 px-3 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
           >
-            <span>{isDarkMode ? '☀️ Light' : '🌙 Dark'}</span>
+            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
 
           {/* User Widget */}
@@ -197,19 +206,29 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Container */}
+      {/* Main Container View Routing */}
       <div className="w-full">
         {!isLoggedIn ? (
           <Login isDarkMode={isDarkMode} onLoginSuccess={handleLoginSuccess} />
         ) : (
           <>
+            {currentView === 'systems' && (
+              <SystemsDirectory 
+                isDarkMode={isDarkMode}
+                onNavigateToSuites={() => setCurrentView('test-suites')}
+                onNavigateToProjects={() => setCurrentView('projects')}
+              />
+            )}
+
             {currentView === 'projects' && (
               <Projects isDarkMode={isDarkMode} onOpenProject={handleOpenProject} />
             )}
+
             {currentView === 'test-suites' && (
               <TestSuites isDarkMode={isDarkMode} currentUser={currentUser} />
             )}
-            {/* 🔒 VIEW GUARD: ONLY ADMIN USERS CAN RENDER USERPORTAL */}
+
+            {/* View Guard for Admin User Portal */}
             {currentView === 'users' && (
               isAdmin ? (
                 <UserPortal isDarkMode={isDarkMode} currentUser={currentUser} />
@@ -217,6 +236,7 @@ export default function App() {
                 <Projects isDarkMode={isDarkMode} onOpenProject={handleOpenProject} />
               )
             )}
+
             {currentView === 'documentation' && (
               <Documentation isDarkMode={isDarkMode} onBackToProjects={() => setCurrentView('projects')} />
             )}

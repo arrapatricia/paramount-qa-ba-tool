@@ -119,6 +119,9 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
   // Lightbox Media Preview State
   const [previewMedia, setPreviewMedia] = useState<Attachment | null>(null);
 
+  // Report Document Modal State
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
   // Create Test Plan Modal State
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [planTitle, setPlanTitle] = useState('');
@@ -334,6 +337,15 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
     localStorage.setItem(`qa_suite_spec_${updatedSuite.id}`, JSON.stringify(updatedSuite));
     setIsEditSuiteModalOpen(false);
     alert("Test Suite specifications updated successfully!");
+  };
+
+  const handleGenerateReport = () => {
+    if (!activeMatrixSuite) return;
+    setIsReportModalOpen(true);
+  };
+
+  const handlePrintPDF = () => {
+    window.print();
   };
 
   const handleOpenEditPlan = (plan: TestPlan) => {
@@ -595,12 +607,13 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
                   return (
                     <div 
                       key={suite.id}
-                      className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all"
+                      onClick={() => handleOpenSuitePage(suite)}
+                      className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all cursor-pointer group"
                     >
                       <div>
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <h3 className="font-extrabold text-lg text-slate-800 dark:text-white">
+                            <h3 className="font-extrabold text-lg text-slate-800 dark:text-white group-hover:text-blue-600 transition-colors">
                               {suite.title}
                             </h3>
                             <div className="flex flex-wrap gap-2 mt-1">
@@ -609,6 +622,7 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
                                   href={getJiraUrl(suite.jira_ticket)}
                                   target="_blank"
                                   rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
                                   className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-all cursor-pointer"
                                 >
                                   <span>JIRA: {suite.jira_ticket}</span>
@@ -645,13 +659,10 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
 
                       <div className="pt-3 border-t border-slate-100 dark:border-slate-800/50 flex justify-between items-center text-[10px] font-bold text-slate-400">
                         <span>Type: {suite.suite_type === 'With JIRA Ticket' ? 'JIRA Ticket' : 'Ad-Hoc Suite'}</span>
-                        <button 
-                          onClick={() => handleOpenSuitePage(suite)}
-                          className="text-blue-600 dark:text-blue-400 hover:underline uppercase tracking-wider font-extrabold cursor-pointer flex items-center space-x-1"
-                        >
-                          <span>OPEN TEST SUITE</span>
+                        <span className="text-blue-600 dark:text-blue-400 group-hover:underline uppercase tracking-wider font-extrabold flex items-center space-x-1">
+                          <span>OPEN SUITE</span>
                           <span>→</span>
-                        </button>
+                        </span>
                       </div>
                     </div>
                   );
@@ -749,12 +760,13 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
   }
 
   // =====================================================================
-  // DEDICATED FULL-PAGE MATRIX VIEW FOR /name_of_test_suite (2-COLUMN GRID LAYOUT)
+  // DEDICATED FULL-PAGE MATRIX VIEW FOR /name_of_test_suite (SIDEBAR LAYOUT)
   // =====================================================================
   if (activeMatrixSuite) {
     const slugName = activeMatrixSuite.title.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     const assignedProjectName = getProjectName(activeMatrixSuite.project_id);
     const linkedPlans = getLinkedPlansForSuite(activeMatrixSuite.id);
+    const currentDateFormatted = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     return (
       <div className={`p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
@@ -771,13 +783,13 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
             <span className="font-mono text-xs font-semibold text-slate-400">/{slugName}</span>
           </div>
 
-          {/* MAIN 2-COLUMN GRID */}
+          {/* MAIN 2-COLUMN SIDEBAR GRID */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             
-            {/* LEFT COLUMN: TEST SPECS & ATTACHMENTS GALLERY */}
+            {/* LEFT SIDEBAR: TEST SPECS & ATTACHMENTS GALLERY */}
             <div className="space-y-6 lg:col-span-1">
               
-              {/* TEST SPECS CARD */}
+              {/* TEST SPECS CARD WITH REPORT GENERATOR */}
               <div className="p-6 rounded-2xl bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800 shadow-sm space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
@@ -834,12 +846,19 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
                   ))}
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
                   <button
                     onClick={handleOpenEditSpecs}
                     className="w-full py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer border border-slate-200 dark:border-slate-700"
                   >
                     Edit Suite Specs
+                  </button>
+
+                  <button
+                    onClick={handleGenerateReport}
+                    className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                  >
+                    Auto-Generate Test Report
                   </button>
                 </div>
               </div>
@@ -890,10 +909,10 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
 
             </div>
 
-            {/* RIGHT COLUMN: THINNER COMPACT METRICS, FORM & TABLE */}
+            {/* RIGHT WORKSPACE COLUMN */}
             <div className="space-y-6 lg:col-span-2">
               
-              {/* THINNER COMPACT DASHBOARD METRICS BAR */}
+              {/* SLIM COMPACT METRICS BAR */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-neutral-cardDark p-3 rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-sm">
                 <div className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800/80 text-center">
                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">Total Cases</span>
@@ -1170,6 +1189,174 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
           </div>
         )}
 
+        {/* PARAMOUNT HTML/PDF TEST REPORT MODAL */}
+        {isReportModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+            <div className="w-full max-w-4xl bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4 max-h-[90vh] flex flex-col">
+              
+              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Paramount QA Test Report Preview</h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Official company report template with embedded image/screenshot evidence.</p>
+                </div>
+                <button onClick={() => setIsReportModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">✕</button>
+              </div>
+
+              {/* PRINTABLE HTML DOCUMENT CONTAINER */}
+              <div id="printable-report" className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-900/60 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div className="bg-white text-slate-900 p-8 shadow-md max-w-3xl mx-auto border border-slate-300 font-sans space-y-6">
+                  
+                  {/* Top Header Banner */}
+                  <div className="border border-slate-900 flex items-stretch">
+                    <div className="bg-[#002B66] text-white px-4 py-2 font-bold text-xs flex items-center shrink-0">
+                      {currentDateFormatted}
+                    </div>
+                    <div className="bg-white text-slate-900 px-4 py-2 font-black text-sm uppercase tracking-wider flex items-center flex-1 border-l border-slate-900">
+                      QA TEST REPORT
+                    </div>
+                  </div>
+
+                  {/* Title & JIRA Ticket Header */}
+                  <div className="border-b border-slate-900 pb-2 space-y-1">
+                    <h1 className="text-xl font-black underline tracking-tight text-slate-900">
+                      {activeMatrixSuite.jira_ticket ? activeMatrixSuite.jira_ticket : activeMatrixSuite.title}
+                    </h1>
+                    <p className="text-xs font-bold text-slate-600 uppercase">Test Report</p>
+                  </div>
+
+                  {/* Test Case Summary Table */}
+                  <div className="space-y-2">
+                    <h2 className="text-xs font-black uppercase text-slate-800">Test Case Summary:</h2>
+                    <table className="w-full border-collapse border border-slate-900 text-xs">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-900 font-bold text-left text-[11px]">
+                          <th className="border-r border-slate-900 p-2 w-1/3">Test Case ID</th>
+                          <th className="p-2">Test Scenario</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {testCases.length > 0 ? (
+                          testCases.map((tc) => (
+                            <tr key={tc.id} className="border-b border-slate-300">
+                              <td className="border-r border-slate-900 p-2 font-mono font-bold text-slate-800">{tc.testCaseId}</td>
+                              <td className="p-2 font-medium text-slate-800">{tc.description}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={2} className="p-4 text-center text-slate-400 italic">No test cases recorded.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Test Executions Detailed Blocks with Embedded Media */}
+                  <div className="space-y-4 pt-2">
+                    <h2 className="text-xs font-black uppercase text-slate-800">Test Executions:</h2>
+
+                    {testCases.length > 0 ? (
+                      testCases.map((tc) => (
+                        <div key={tc.id} className="border border-slate-900 rounded-none text-xs overflow-hidden space-y-0">
+                          <div className="grid grid-cols-4 border-b border-slate-900 bg-slate-50">
+                            <div className="p-2 font-bold border-r border-slate-900 text-slate-700 bg-slate-100">Scenario</div>
+                            <div className="p-2 col-span-3 space-y-1 font-medium">
+                              <div><strong className="text-slate-900">Given:</strong> {tc.preconditions || 'System is operational'}</div>
+                              <div><strong className="text-slate-900">When:</strong> {tc.description}</div>
+                              <div><strong className="text-slate-900">Then:</strong> {tc.expectedResult}</div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-4 border-b border-slate-900">
+                            <div className="p-2 font-bold border-r border-slate-900 text-slate-700 bg-slate-100">Test Case ID</div>
+                            <div className="p-2 col-span-3 font-mono font-bold text-blue-800">{tc.testCaseId}</div>
+                          </div>
+
+                          <div className="grid grid-cols-4 border-b border-slate-900">
+                            <div className="p-2 font-bold border-r border-slate-900 text-slate-700 bg-slate-100">Test Data</div>
+                            <div className="p-2 col-span-3 text-slate-800">
+                              {tc.attachments && tc.attachments.length > 0
+                                ? tc.attachments.map(a => a.name).join(', ')
+                                : 'N/A'}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-4 border-b border-slate-900">
+                            <div className="p-2 font-bold border-r border-slate-900 text-slate-700 bg-slate-100">Test Result</div>
+                            <div className="p-2 col-span-3 font-black tracking-wider text-slate-900">
+                              <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${
+                                tc.status === 'Passed' ? 'bg-green-100 text-green-800' :
+                                tc.status === 'Failed' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-800'
+                              }`}>
+                                {tc.status}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Embedded Screenshots Inside PDF Output */}
+                          {tc.attachments && tc.attachments.some(a => a.type === 'image') && (
+                            <div className="p-3 bg-slate-50 border-t border-slate-300 space-y-2">
+                              <span className="text-[10px] font-black uppercase text-slate-500 block">Execution Evidence Screenshots:</span>
+                              <div className="grid grid-cols-2 gap-2">
+                                {tc.attachments.filter(a => a.type === 'image').map(img => (
+                                  <div key={img.id} className="border border-slate-300 rounded overflow-hidden bg-white p-1">
+                                    <img src={img.url} alt={img.name} className="max-h-48 w-full object-contain mx-auto" />
+                                    <span className="block text-[9px] text-center text-slate-500 font-mono mt-1 truncate">{img.name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No execution logs available.</p>
+                    )}
+                  </div>
+
+                  {/* Document Footer */}
+                  <div className="border border-slate-900 flex items-stretch mt-8 pt-0">
+                    <div className="bg-[#002B66] text-white px-3 py-1 font-black text-xs flex items-center justify-center">
+                      1
+                    </div>
+                    <div className="p-2 text-[10px] font-bold text-slate-700 flex-1 border-l border-slate-900">
+                      QA Team | Systems and Development<br />
+                      Paramount Life & General Insurance Inc.
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Printable Media CSS Overrides */}
+              <style>{`
+                @media print {
+                  body * { visibility: hidden; }
+                  #printable-report, #printable-report * { visibility: visible; }
+                  #printable-report { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; }
+                }
+              `}</style>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                <button
+                  onClick={() => setIsReportModalOpen(false)}
+                  className="px-4 py-2 border rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all cursor-pointer text-xs"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handlePrintPDF}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+                >
+                  Print / Save as PDF
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
         {/* EDIT SUITE SPECS MODAL */}
         {isEditSuiteModalOpen && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
@@ -1294,7 +1481,7 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
             <h1 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">
               {activeTab === 'plans' 
                 ? 'Release Test Plans' 
-                : showTrash ? 'Trashed Test Suites' : 'QA Test Suites'}
+                : showTrash ? 'Archived Test Suites' : 'QA Test Suites'}
             </h1>
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-1">
               {activeTab === 'plans'
@@ -1335,7 +1522,7 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
                       : 'bg-slate-200/60 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300/60'
                   }`}
                 >
-                  <span>{showTrash ? 'Active Suites' : `Trash Bin (${trashedSuites.length})`}</span>
+                  <span>{showTrash ? 'Active Suites' : `Archived (${trashedSuites.length})`}</span>
                 </button>
 
                 {!showTrash && (
@@ -1370,12 +1557,13 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
                   return (
                     <div 
                       key={suite.id}
-                      className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all"
+                      onClick={() => handleOpenSuitePage(suite)}
+                      className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all cursor-pointer group"
                     >
                       <div>
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <h3 className="font-extrabold text-lg text-slate-800 dark:text-white">
+                            <h3 className="font-extrabold text-lg text-slate-800 dark:text-white group-hover:text-blue-600 transition-colors">
                               {suite.title}
                             </h3>
                             <div className="flex flex-wrap gap-2 mt-1">
@@ -1384,6 +1572,7 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
                                   href={getJiraUrl(suite.jira_ticket)}
                                   target="_blank"
                                   rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
                                   className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-all cursor-pointer"
                                 >
                                   <span>JIRA: {suite.jira_ticket}</span>
@@ -1406,7 +1595,7 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
                               {linkedPlans.map(lp => (
                                 <button
                                   key={lp.id}
-                                  onClick={() => handleOpenPlanPage(lp)}
+                                  onClick={(e) => { e.stopPropagation(); handleOpenPlanPage(lp); }}
                                   className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                                 >
                                   Plan: {lp.planId} ({lp.title})
@@ -1435,21 +1624,18 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
                           {!showTrash ? (
                             <>
                               <button 
-                                onClick={() => handleMoveToTrash(suite.id)}
+                                onClick={(e) => { e.stopPropagation(); handleMoveToTrash(suite.id); }}
                                 className="text-red-500 hover:underline uppercase tracking-wider font-extrabold cursor-pointer"
                               >
-                                Move to Trash
+                                Delete
                               </button>
-                              <button 
-                                onClick={() => handleOpenSuitePage(suite)}
-                                className="text-blue-600 dark:text-blue-400 hover:underline uppercase tracking-wider font-extrabold cursor-pointer"
-                              >
-                                OPEN TEST CASES →
-                              </button>
+                              <span className="text-blue-600 dark:text-blue-400 group-hover:underline uppercase tracking-wider font-extrabold cursor-pointer">
+                                OPEN →
+                              </span>
                             </>
                           ) : (
                             <button 
-                              onClick={() => handleRestoreFromTrash(suite.id)}
+                              onClick={(e) => { e.stopPropagation(); handleRestoreFromTrash(suite.id); }}
                               className="text-emerald-500 hover:underline uppercase tracking-wider font-extrabold cursor-pointer"
                             >
                               Restore Suite
@@ -1464,10 +1650,10 @@ export default function TestSuites({ isDarkMode }: TestSuitesProps) {
             ) : (
               <div className="max-w-md mx-auto my-16 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-10 shadow-md">
                 <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">
-                  {showTrash ? 'Trash Bin is Empty' : 'No Test Suites Found'}
+                  {showTrash ? 'Archived Box is Empty' : 'No Test Suites Found'}
                 </h2>
                 <p className="text-xs font-medium text-slate-400 dark:text-slate-500 mt-2 mb-6 leading-relaxed">
-                  {showTrash ? 'No soft-deleted test suites pending expiration.' : 'You haven\'t logged any ad-hoc or JIRA test suites yet.'}
+                  {showTrash ? 'No archived test suites pending expiration.' : 'You haven\'t logged any ad-hoc or JIRA test suites yet.'}
                 </p>
                 {!showTrash && (
                   <button
