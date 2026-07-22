@@ -8,7 +8,8 @@ interface LoginProps {
   onLoginSuccess: (userData: any) => void;
 }
 
-const API_BASE_URL = 'https://web-production-8e05d.up.railway.app';
+// const API_BASE_URL = 'https://web-production-8e05d.up.railway.app';
+const API_BASE_URL = 'https://paramount-qa-ba-tool-production.up.railway.app';
 
 export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
   const [username, setUsername] = useState('');

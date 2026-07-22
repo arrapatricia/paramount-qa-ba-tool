@@ -107,7 +107,8 @@ export const qaSuiteAPI = {
     priority: string; 
     suite_type?: string; 
     jira_ticket?: string; 
-    project_id?: number | null 
+    project_id?: number | null;
+    assigned_qa?: string;
   }) => {
     const res = await API.post('/qa-suites', data);
     return res.data;
