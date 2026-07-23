@@ -21,6 +21,9 @@ interface ProjectsProps {
 
 export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>(() => {
+    // Purge legacy storage keys if present
+    localStorage.removeItem('paramount_projects');
+    
     const saved = localStorage.getItem('qa_ba_projects');
     return saved ? JSON.parse(saved) : [];
   });
@@ -59,21 +62,23 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
 
   const handleCreateProject = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newName.trim()) return;
+
     const newProj: Project = {
-      id: newName.toLowerCase().replace(/\s+/g, '-'),
-      name: newName,
-      about: newAbout,
-      objectives: newObjectives,
-      requestor: newRequestor,
-      devAssignee: newDev,
-      qaAssignee: newQa,
-      baAssignee: newBa,
+      id: newName.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+      name: newName.trim(),
+      about: newAbout.trim() || 'No description provided.',
+      objectives: newObjectives.trim(),
+      requestor: newRequestor.trim(),
+      devAssignee: newDev.trim(),
+      qaAssignee: newQa.trim(),
+      baAssignee: newBa.trim() || 'Admin',
       status: 'Active',
       createdDate: new Date().toISOString().split('T')[0],
       archivedAt: null
     };
     
-    setProjects(prev => [...prev, newProj]);
+    setProjects(prev => [newProj, ...prev]);
     setIsModalOpen(false);
     
     setNewName('');
@@ -92,6 +97,19 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
 
   const handleRestoreProject = (id: string) => {
     setProjects(prev => prev.map(p => p.id === id ? { ...p, archivedAt: null } : p));
+  };
+
+  const handleDeletePermanently = (id: string) => {
+    if (confirm("Are you sure you want to permanently delete this project workspace?")) {
+      setProjects(prev => prev.filter(p => p.id !== id));
+    }
+  };
+
+  const handleClearAllProjects = () => {
+    if (confirm("Are you sure you want to clear ALL project records from local storage?")) {
+      setProjects([]);
+      localStorage.removeItem('qa_ba_projects');
+    }
   };
 
   const handleOpenFolder = (project: Project) => {
@@ -121,6 +139,15 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
         
         {/* Toolbar Buttons */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          {projects.length > 0 && (
+            <button
+              onClick={handleClearAllProjects}
+              className="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center"
+            >
+              Clear All
+            </button>
+          )}
+
           <button
             onClick={() => setShowArchived(!showArchived)}
             className={`flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center ${
@@ -172,7 +199,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
                     <span>Created: <span className="font-bold text-slate-700 dark:text-slate-200">{project.createdDate}</span></span>
                   </p>
                   <p className="flex items-center space-x-2">
-                    <span>Owner: <span className="font-bold text-slate-700 dark:text-slate-200">{project.baAssignee}</span></span>
+                    <span>Owner: <span className="font-bold text-slate-700 dark:text-slate-200">{project.baAssignee || 'Admin'}</span></span>
                   </p>
                 </div>
               </div>
@@ -194,12 +221,20 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
                     </button>
                   </>
                 ) : (
-                  <button 
-                    onClick={() => handleRestoreProject(project.id)}
-                    className="w-full py-2.5 rounded-xl text-center font-black text-xs uppercase tracking-widest text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white transition-all shadow-sm cursor-pointer"
-                  >
-                    Restore Project
-                  </button>
+                  <div className="flex flex-col space-y-2">
+                    <button 
+                      onClick={() => handleRestoreProject(project.id)}
+                      className="w-full py-2 rounded-xl text-center font-black text-xs uppercase tracking-widest text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white transition-all shadow-sm cursor-pointer"
+                    >
+                      Restore Project
+                    </button>
+                    <button 
+                      onClick={() => handleDeletePermanently(project.id)}
+                      className="w-full text-center font-extrabold text-[10px] uppercase tracking-wider text-red-500 hover:underline cursor-pointer"
+                    >
+                      Delete Permanently
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -230,7 +265,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
           <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-5 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3">
               <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Initialize Project Workspace</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">✕</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">X</button>
             </div>
             
             <form onSubmit={handleCreateProject} className="space-y-3.5 text-xs">
@@ -295,7 +330,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
 
               <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all cursor-pointer">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-[#10065F] hover:bg-[#180A8C] text-white font-black rounded-xl transition-all shadow-md cursor-pointer">Save Project</button>
+                <button type="submit" className="px-4 py-2 bg-[#10065F] hover:bg-[#180A8C] text-white font-black rounded-xl transition-all shadow-md cursor-pointer uppercase tracking-wider">Save Project</button>
               </div>
             </form>
           </div>

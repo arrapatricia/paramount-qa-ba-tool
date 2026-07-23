@@ -81,55 +81,13 @@ const DEFAULT_SYSTEMS: SystemCategory[] = [
       { label: 'LIVE', url: 'https://paramount.com.ph/' },
     ],
   },
-  {
-    id: 'claims',
-    code: 'CLAIMS',
-    name: 'Claims E-Filing System',
-    description: 'Online claims registration, document upload, and status tracker system.',
-    environments: [
-      { label: 'DEV', url: '#' },
-      { label: 'STAGING', url: '#' },
-      { label: 'LIVE', url: '#' },
-    ],
-  },
-  {
-    id: 'agent',
-    code: 'AGENT',
-    name: 'Agent Partner Hub',
-    description: 'Sales agent portal for policy processing, commission tracking, and quotes.',
-    environments: [
-      { label: 'STAGING', url: '#' },
-      { label: 'LIVE', url: '#' },
-    ],
-  },
-  {
-    id: 'pay',
-    code: 'PAY',
-    name: 'Central Payment Gateway',
-    description: 'Unified payment API gateway processing credit card, e-wallet, and OTC payments.',
-    environments: [
-      { label: 'DEV', url: '#' },
-      { label: 'LIVE', url: '#' },
-    ],
-  },
-  {
-    id: 'uw',
-    code: 'UW',
-    name: 'Underwriting Engine',
-    description: 'Automated policy risk calculation and automated underwriting approval system.',
-    environments: [
-      { label: 'DEV', url: '#' },
-      { label: 'STAGING', url: '#' },
-    ],
-  },
 ];
 
-const ITEMS_PER_PAGE = 9;
+const ITEMS_PER_PAGE = 6; // Strictly 6 items per page grid (3 columns x 2 rows)
 
 export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
   const [systems, setSystems] = useState<SystemCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(0);
 
   // Add / Edit Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -152,11 +110,6 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
       localStorage.setItem('paramount_systems_directory', JSON.stringify(DEFAULT_SYSTEMS));
     }
   }, []);
-
-  // Reset carousel page back to 0 whenever search query changes
-  useEffect(() => {
-    setCurrentPage(0);
-  }, [searchQuery]);
 
   const handleOpenAddModal = () => {
     setEditingSystemId(null);
@@ -244,24 +197,11 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
     sys.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Carousel Pagination Calculations
-  const totalPages = Math.ceil(filteredSystems.length / ITEMS_PER_PAGE) || 1;
-
-  const paginatedPages = Array.from({ length: totalPages }, (_, index) =>
-    filteredSystems.slice(index * ITEMS_PER_PAGE, (index + 1) * ITEMS_PER_PAGE)
+  // Group items into chunks of 6
+  const pageGroups = Array.from(
+    { length: Math.ceil(filteredSystems.length / ITEMS_PER_PAGE) || 1 },
+    (_, idx) => filteredSystems.slice(idx * ITEMS_PER_PAGE, (idx + 1) * ITEMS_PER_PAGE)
   );
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages - 1) {
-      setCurrentPage(prev => prev + 1);
-    }
-  };
-
-  const handlePrevPage = () => {
-    if (currentPage > 0) {
-      setCurrentPage(prev => prev - 1);
-    }
-  };
 
   const getBadgeStyle = (label: string) => {
     switch (label) {
@@ -307,7 +247,7 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
           </div>
         </div>
 
-        {/* Search & Carousel Controls Bar */}
+        {/* Search Bar & Status */}
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-sm">
           <div className="relative flex-1 max-w-md">
             <input
@@ -319,44 +259,30 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
             />
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end space-x-4">
+          <div className="flex items-center justify-between sm:justify-end space-x-3">
             <span className="text-xs font-bold text-slate-400">
-              Showing {filteredSystems.length} Platforms (Page {currentPage + 1} of {totalPages})
+              Showing {filteredSystems.length} Platforms
             </span>
-
-            {/* Carousel Navigation Buttons */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handlePrevPage}
-                disabled={currentPage === 0}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer font-black text-xs uppercase"
-              >
-                PREV
-              </button>
-
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage >= totalPages - 1}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-[#10065F] text-white hover:bg-[#180A8C] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer font-black text-xs uppercase"
-              >
-                NEXT
-              </button>
-            </div>
+            {filteredSystems.length > 6 && (
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                Scroll Horizontally ➔
+              </span>
+            )}
           </div>
         </div>
 
-        {/* SIDEWARDS CAROUSEL CONTAINER (9 Systems Per Slide in 3x3 Grid) */}
-        <div className="overflow-hidden w-full rounded-2xl">
-          <div
-            className="flex transition-transform duration-500 ease-in-out w-full"
-            style={{ transform: `translateX(-${currentPage * 100}%)` }}
-          >
-            {paginatedPages.map((pageGroup, pageIdx) => (
-              <div key={pageIdx} className="w-full shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {pageGroup.map((system) => (
+        {/* 🛷 HORIZONTAL SLIDER: 6 Cards per Page Grid (3 cols x 2 rows) */}
+        <div className="w-full overflow-x-auto pb-6 pt-1 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+          <div className="flex gap-8 min-w-full">
+            {pageGroups.map((group, pageIndex) => (
+              <div 
+                key={pageIndex} 
+                className="w-full shrink-0 snap-start grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 grid-rows-2 gap-6"
+              >
+                {group.map((system) => (
                   <div
                     key={system.id}
-                    className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all"
+                    className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all h-[220px]"
                   >
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
@@ -379,17 +305,17 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
                         </div>
                       </div>
 
-                      <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">
+                      <h3 className="text-lg font-extrabold text-slate-800 dark:text-white truncate">
                         {system.name}
                       </h3>
 
-                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-3">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2">
                         {system.description}
                       </p>
                     </div>
 
                     {/* Environment Buttons List */}
-                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-2">
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 space-y-2">
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
                         Available Environments:
                       </span>
@@ -401,7 +327,7 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
                             href={env.url}
                             target="_blank"
                             rel="noreferrer"
-                            className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${getBadgeStyle(env.label)}`}
+                            className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-xl border text-xs font-bold transition-all cursor-pointer ${getBadgeStyle(env.label)}`}
                           >
                             <span>{env.label}</span>
                           </a>
@@ -420,22 +346,6 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
             )}
           </div>
         </div>
-
-        {/* Carousel Pagination Dots */}
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center space-x-2 pt-2">
-            {Array.from({ length: totalPages }).map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentPage(idx)}
-                className={`h-2.5 rounded-full transition-all cursor-pointer ${
-                  currentPage === idx ? 'w-8 bg-[#10065F] dark:bg-blue-400' : 'w-2.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400'
-                }`}
-                title={`Go to page ${idx + 1}`}
-              />
-            ))}
-          </div>
-        )}
 
       </div>
 
