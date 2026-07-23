@@ -96,7 +96,7 @@ export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
             disabled={isAuthenticating}
             className="w-full mt-2 py-4 rounded-xl font-bold tracking-wider text-white bg-[#10065F] hover:bg-[#180A8C] transition-all disabled:opacity-50 cursor-pointer shadow-md"
           >
-            {isAuthenticating ? 'Logging In...' : 'Sign In'}
+            {isAuthenticating ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
       </div>
@@ -108,10 +108,8 @@ export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
         </p>
         <div className="flex items-center justify-center space-x-2 text-[10px] font-mono font-bold">
           <span className="px-2 py-0.5 rounded bg-blue-500/10 text-[#10065F] dark:text-blue-400 border border-blue-500/20">
-            Version v{packageJson.version}
+           v{packageJson.version}
           </span>
-          <span>•</span>
-          <span className="text-slate-400">Paramount Workspace</span>
         </div>
       </footer>
 

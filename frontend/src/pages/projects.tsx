@@ -21,11 +21,22 @@ interface ProjectsProps {
 
 export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>(() => {
-    // Purge legacy storage keys if present
+    // 🧹 Purge ALL legacy mock project cache keys permanently
     localStorage.removeItem('paramount_projects');
-    
+
     const saved = localStorage.getItem('qa_ba_projects');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed: Project[] = JSON.parse(saved);
+        // Filter out the persistent 'CTPL System' mock project if present
+        const cleaned = parsed.filter(p => p.name !== 'CTPL System' && p.id !== 'ctpl-system');
+        localStorage.setItem('qa_ba_projects', JSON.stringify(cleaned));
+        return cleaned;
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
   });
 
   const [showArchived, setShowArchived] = useState(false);
