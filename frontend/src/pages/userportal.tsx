@@ -365,7 +365,7 @@ export default function UserPortal({ isDarkMode, currentUser }: UserPortalProps)
       <div className="flex min-h-[calc(100vh-73px)] items-center justify-center p-4">
         <div className="text-center space-y-4">
           <div className="w-10 h-10 border-4 border-[#10065F] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Connecting to Database...</p>
+          <p className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Reloading User Portal Page...</p>
         </div>
       </div>
     );
