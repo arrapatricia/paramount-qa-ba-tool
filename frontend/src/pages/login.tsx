@@ -8,7 +8,6 @@ interface LoginProps {
   onLoginSuccess: (userData: any) => void;
 }
 
-// const API_BASE_URL = 'https://web-production-8e05d.up.railway.app';
 const API_BASE_URL = 'https://paramount-qa-ba-tool-production.up.railway.app';
 
 export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
@@ -89,7 +88,7 @@ export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
           <button 
             type="submit" 
             disabled={isAuthenticating}
-            className="w-full mt-2 py-4 rounded-xl font-bold tracking-wider text-white bg-blue-600 hover:bg-blue-500 transition-all disabled:opacity-50 cursor-pointer shadow-md"
+            className="w-full mt-2 py-4 rounded-xl font-bold tracking-wider text-white bg-[#10065F] hover:bg-[#180A8C] transition-all disabled:opacity-50 cursor-pointer shadow-md"
           >
             {isAuthenticating ? 'Verifying Account...' : 'Sign In'}
           </button>

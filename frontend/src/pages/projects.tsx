@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { qaSuiteAPI } from '../services/api';
 
 interface Project {
   id: string;
@@ -12,6 +11,7 @@ interface Project {
   baAssignee: string;
   status: 'Active' | 'Inactive';
   createdDate: string;
+  archivedAt?: string | null;
 }
 
 interface ProjectsProps {
@@ -20,12 +20,12 @@ interface ProjectsProps {
 }
 
 export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
-  // Load initial projects from localStorage, default to empty array if none exist
   const [projects, setProjects] = useState<Project[]>(() => {
     const saved = localStorage.getItem('qa_ba_projects');
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [showArchived, setShowArchived] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // New Project Form State
@@ -37,18 +37,24 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
   const [newQa, setNewQa] = useState('');
   const [newBa, setNewBa] = useState('');
 
-  // Ad-Hoc QA Test Suite Form State
-  const [isAdHocModalOpen, setIsAdHocModalOpen] = useState(false);
-  const [adHocTitle, setAdHocTitle] = useState('');
-  const [adHocDescription, setAdHocDescription] = useState('');
-  const [adHocPriority, setAdHocPriority] = useState('Medium');
-  const [suiteType, setSuiteType] = useState<'Adhoc' | 'With JIRA Ticket'>('Adhoc');
-  const [jiraTicket, setJiraTicket] = useState('');
-  const [isSubmittingAdHoc, setIsSubmittingAdHoc] = useState(false);
-
-  // Persist projects locally whenever the list updates
+  // Persist projects locally and clean up expired archives (> 15 days)
   useEffect(() => {
-    localStorage.setItem('qa_ba_projects', JSON.stringify(projects));
+    const FIFTEEN_DAYS_MS = 15 * 24 * 60 * 60 * 1000;
+    const now = new Date().getTime();
+
+    const unexpiredProjects = projects.filter(p => {
+      if (p.archivedAt) {
+        const archivedTime = new Date(p.archivedAt).getTime();
+        if (now - archivedTime > FIFTEEN_DAYS_MS) return false;
+      }
+      return true;
+    });
+
+    if (unexpiredProjects.length !== projects.length) {
+      setProjects(unexpiredProjects);
+    }
+
+    localStorage.setItem('qa_ba_projects', JSON.stringify(unexpiredProjects));
   }, [projects]);
 
   const handleCreateProject = (e: React.FormEvent) => {
@@ -63,13 +69,13 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
       qaAssignee: newQa,
       baAssignee: newBa,
       status: 'Active',
-      createdDate: new Date().toISOString().split('T')[0]
+      createdDate: new Date().toISOString().split('T')[0],
+      archivedAt: null
     };
     
     setProjects(prev => [...prev, newProj]);
     setIsModalOpen(false);
     
-    // Reset Form
     setNewName('');
     setNewAbout('');
     setNewObjectives('');
@@ -79,41 +85,23 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
     setNewBa('');
   };
 
-  // Handles standalone / Ad-Hoc QA Test Suite Creation
-  const handleCreateAdHocSuite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setIsSubmittingAdHoc(true);
-      
-      // Inline cast as any prevents TS payload error while maintaining full functionality
-      await qaSuiteAPI.create({
-        title: adHocTitle,
-        description: adHocDescription,
-        priority: adHocPriority,
-        suite_type: suiteType,
-        jira_ticket: suiteType === 'With JIRA Ticket' ? jiraTicket : '',
-        project_id: null,
-      } as any);
-
-      alert("QA Test Suite created successfully!");
-      setIsAdHocModalOpen(false);
-      setAdHocTitle('');
-      setAdHocDescription('');
-      setAdHocPriority('Medium');
-      setSuiteType('Adhoc');
-      setJiraTicket('');
-    } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to create test suite.");
-    } finally {
-      setIsSubmittingAdHoc(false);
-    }
+  const handleArchiveProject = (id: string) => {
+    const timestamp = new Date().toISOString();
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, archivedAt: timestamp } : p));
   };
 
-  // Triggers folder navigation and caches the exact metadata object
+  const handleRestoreProject = (id: string) => {
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, archivedAt: null } : p));
+  };
+
   const handleOpenFolder = (project: Project) => {
     localStorage.setItem('qa_ba_current_project', JSON.stringify(project));
     onOpenProject(project.id);
   };
+
+  const activeProjects = projects.filter(p => !p.archivedAt);
+  const archivedProjects = projects.filter(p => !!p.archivedAt);
+  const displayedProjects = showArchived ? archivedProjects : activeProjects;
 
   return (
     <div className={`p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
@@ -122,35 +110,43 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 max-w-5xl mx-auto">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">
-            Projects Directory
+            {showArchived ? 'Archived Projects' : 'Projects'}
           </h1>
           <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-1">
-            Select an active workspace folder to manage documents and execution test suites.
+            {showArchived 
+              ? 'Archived project workspace containers will be permanently purged after 15 days.' 
+              : 'Select an active workspace folder to manage documents and specs.'}
           </p>
         </div>
         
-        {/* Action Buttons Header Toolbar */}
+        {/* Toolbar Buttons */}
         <div className="flex items-center space-x-3">
           <button
-            onClick={() => setIsAdHocModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl border border-purple-500/30 text-purple-600 dark:text-purple-300 hover:bg-purple-600 hover:text-white text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-[0.98] flex items-center space-x-1.5"
+            onClick={() => setShowArchived(!showArchived)}
+            className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              showArchived 
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500/20' 
+                : 'bg-slate-200/60 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300/60'
+            }`}
           >
-            <span>🧪 + Create Test Suite</span>
+            {showArchived ? 'Active Projects' : `Archived (${archivedProjects.length})`}
           </button>
 
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-500 transition-all shadow-md active:scale-[0.98]"
-          >
-            + New Project
-          </button>
+          {!showArchived && (
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider text-white bg-[#10065F] hover:bg-[#180A8C] transition-all shadow-md active:scale-[0.98] cursor-pointer"
+            >
+              + New Project
+            </button>
+          )}
         </div>
       </div>
 
       {/* Folders Grid */}
-      {projects.length > 0 ? (
+      {displayedProjects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {projects.map(project => (
+          {displayedProjects.map(project => (
             <div 
               key={project.id} 
               className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-6 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between"
@@ -173,48 +169,68 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
                 
                 <div className="text-[11px] font-semibold space-y-2 text-slate-400 dark:text-slate-500 mb-6">
                   <p className="flex items-center space-x-2">
-                    <span>📅</span> 
                     <span>Created: <span className="font-bold text-slate-700 dark:text-slate-200">{project.createdDate}</span></span>
                   </p>
                   <p className="flex items-center space-x-2">
-                    <span>👤</span> 
                     <span>Owner: <span className="font-bold text-slate-700 dark:text-slate-200">{project.baAssignee}</span></span>
                   </p>
                 </div>
               </div>
 
-              <button 
-                onClick={() => handleOpenFolder(project)}
-                className="w-full py-2.5 rounded-xl text-center font-black text-xs uppercase tracking-widest text-white bg-slate-900 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 transition-all shadow-sm active:scale-[0.98]"
-              >
-                📁 Open Folder
-              </button>
+              <div className="space-y-2">
+                {!showArchived ? (
+                  <>
+                    <button 
+                      onClick={() => handleOpenFolder(project)}
+                      className="w-full py-2.5 rounded-xl text-center font-black text-xs uppercase tracking-widest text-white bg-[#10065F] hover:bg-[#180A8C] transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+                    >
+                      Open Folder
+                    </button>
+                    <button 
+                      onClick={() => handleArchiveProject(project.id)}
+                      className="w-full text-center font-extrabold text-[10px] uppercase tracking-wider text-red-500 hover:underline cursor-pointer"
+                    >
+                      Archive Project
+                    </button>
+                  </>
+                ) : (
+                  <button 
+                    onClick={() => handleRestoreProject(project.id)}
+                    className="w-full py-2.5 rounded-xl text-center font-black text-xs uppercase tracking-widest text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white transition-all shadow-sm cursor-pointer"
+                  >
+                    Restore Project
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
       ) : (
         <div className="max-w-md mx-auto my-16 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-10 shadow-md">
-          <div className="text-4xl mb-4">📁</div>
-          <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">Project Workspace Empty</h2>
+          <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">
+            {showArchived ? 'No Archived Projects' : 'Project Workspace Empty'}
+          </h2>
           <p className="text-xs font-medium text-slate-400 dark:text-slate-500 mt-2 mb-6 leading-relaxed max-w-xs mx-auto">
-            There are currently no workspace folders configured. Initialize your dynamic tracking matrix by adding your first project module.
+            {showArchived ? 'There are currently no archived projects in the trash queue.' : 'There are currently no workspace folders configured. Add your first project to get started.'}
           </p>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black tracking-wider uppercase transition-all shadow-md active:scale-[0.98]"
-          >
-            ＋ Add First Project
-          </button>
+          {!showArchived && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="px-6 py-2.5 bg-[#10065F] hover:bg-[#180A8C] text-white rounded-xl text-xs font-black tracking-wider uppercase transition-all shadow-md active:scale-[0.98] cursor-pointer"
+            >
+              + Add First Project
+            </button>
+          )}
         </div>
       )}
 
-      {/* --- MODAL 1: CREATE NEW PROJECT --- */}
+      {/* MODAL: CREATE NEW PROJECT */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
           <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3 mb-5">
               <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Initialize Project Workspace</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">✕</button>
             </div>
             
             <form onSubmit={handleCreateProject} className="space-y-4 text-xs">
@@ -278,93 +294,8 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
               </div>
 
               <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all shadow-md">Save Project</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL 2: CREATE QA TEST SUITE --- */}
-      {isAdHocModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3 mb-5">
-              <div>
-                <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Create QA Test Suite</h3>
-                <p className="text-[10px] text-slate-400 font-medium">Standalone test suite decoupled from project containers.</p>
-              </div>
-              <button onClick={() => setIsAdHocModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
-            </div>
-
-            <form onSubmit={handleCreateAdHocSuite} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Test Suite Type</label>
-                <select
-                  value={suiteType} onChange={(e: any) => setSuiteType(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="Adhoc">Adhoc (Other)</option>
-                  <option value="With JIRA Ticket">With JIRA Ticket</option>
-                </select>
-              </div>
-
-              {suiteType === 'With JIRA Ticket' && (
-                <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">JIRA Ticket Key / ID</label>
-                  <input
-                    type="text" required value={jiraTicket} onChange={(e) => setJiraTicket(e.target.value)}
-                    placeholder="e.g., PD-1111"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Suite Title</label>
-                <input
-                  type="text" required value={adHocTitle} onChange={(e) => setAdHocTitle(e.target.value)}
-                  placeholder="e.g., Quick Regression Check - Auth API"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Priority Level</label>
-                <select
-                  value={adHocPriority} onChange={(e) => setAdHocPriority(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="Low">Low Priority</option>
-                  <option value="Medium">Medium Priority</option>
-                  <option value="High">High Priority</option>
-                  <option value="Critical">Critical Priority</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Description / Notes</label>
-                <textarea
-                  rows={3} value={adHocDescription} onChange={(e) => setAdHocDescription(e.target.value)}
-                  placeholder="Add scope details or quick notes for this test suite..."
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none focus:ring-1 focus:ring-blue-500 resize-none leading-relaxed"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-4">
-                <button
-                  type="button" onClick={() => setIsAdHocModalOpen(false)}
-                  className="px-4 py-2 border rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit" disabled={isSubmittingAdHoc}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl transition-all shadow-md disabled:opacity-50"
-                >
-                  {isSubmittingAdHoc ? 'Creating...' : 'Create Suite'}
-                </button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all cursor-pointer">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-[#10065F] hover:bg-[#180A8C] text-white font-black rounded-xl transition-all shadow-md cursor-pointer">Save Project</button>
               </div>
             </form>
           </div>

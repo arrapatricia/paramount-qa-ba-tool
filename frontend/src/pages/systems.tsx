@@ -232,9 +232,9 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
           <div className="shrink-0">
             <button
               onClick={handleOpenAddModal}
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer"
             >
-              + Add New System
+              + Log New System
             </button>
           </div>
         </div>
@@ -449,7 +449,7 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+                  className="px-4 py-2 bg-[#10065F] hover:bg-[#180A8C] text-white font-black uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
                 >
                   Save System
                 </button>

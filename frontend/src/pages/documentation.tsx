@@ -1,29 +1,10 @@
 import { useState, useRef } from 'react';
 import logoDocs from '../assets/logo_docs.png';
-import QaTestSuite from '../components/qatestsuite';
 
-// --- TYPES & INTERFACES ---
 interface DocPage {
   id: string;
   title: string;
   content: string;
-}
-
-interface TestCase {
-  id: string;
-  description: string;
-  preconditions: string;
-  expectedResult: string;
-  status: 'PASSED' | 'FAILED' | 'PENDING';
-  assignedQa?: string;
-  attachments?: { name: string; url: string }[];
-}
-
-interface QaSuiteItem {
-  id: string;
-  title: string;
-  jiraTicket?: string;
-  testCases: TestCase[];
 }
 
 interface ProjectSpecs {
@@ -58,7 +39,6 @@ const DEFAULT_PROJECT_SPECS: ProjectSpecs = {
 
 export default function Documentation({ isDarkMode, onBackToProjects, selectedProject }: DocumentationProps) {
   
-  // Dynamic state resolver: Safely loads from either localStorage or selectedProject prop fallback
   const [projectSpecs, setProjectSpecs] = useState<ProjectSpecs>(() => {
     const cached = localStorage.getItem('qa_ba_current_project');
     if (cached) {
@@ -91,36 +71,16 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
 
   const currentUser = projectSpecs.baAssigned !== "Unassigned" ? projectSpecs.baAssigned : "System User";
 
-  // Document & QA Suite states
+  // Document pages state
   const [pages, setPages] = useState<DocPage[]>([]);
-  const [qaSuites, setQaSuites] = useState<QaSuiteItem[]>([
-    {
-      id: 'suite-default-1',
-      title: 'PD Application Form',
-      jiraTicket: 'ASPD-211',
-      testCases: [
-        { id: 'TEST-001', description: 'Validate input fields', preconditions: '—', expectedResult: 'Success', status: 'FAILED' },
-        { id: 'TEST-002', description: 'Submit policy form', preconditions: '—', expectedResult: 'Policy generated', status: 'PASSED' },
-        { id: 'TEST-003', description: 'Payment processing endpoint', preconditions: '—', expectedResult: '200 OK', status: 'PASSED', attachments: [{ name: 'Logo.bmp', url: '#' }] },
-        { id: 'TEST-004', description: 'Database audit record sync', preconditions: '—', expectedResult: 'Audit created', status: 'PASSED', attachments: [{ name: 'Code_xuw5Fk.png', url: '#' }] },
-      ]
-    }
-  ]);
-
-  // Form states for creating test cases inside embedded suites
-  const [tcDescription, setTcDescription] = useState('');
-  const [tcPreconditions, setTcPreconditions] = useState('');
-  const [tcExpectedResult, setTcExpectedResult] = useState('');
-  const [tcStatus, setTcStatus] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PENDING');
 
   // Editor states
   const [editorMode, setEditorMode] = useState<'visual' | 'code'>('visual');
   const [newPageTitle, setNewPageTitle] = useState<string>('');
-  const [newQaSuiteTitle, setNewQaSuiteTitle] = useState<string>('');
   const [aiPrompt, setAiPrompt] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [notes, setNotes] = useState<string>('');
-  const [isAiPanelOpen, setIsAiPanelOpen] = useState<boolean>(true);
+  const [isNavOpen, setIsNavOpen] = useState<boolean>(true);
 
   // Tags State
   const [wordTags, setWordTags] = useState<string[]>([]);
@@ -147,76 +107,12 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
     const newPageObj: DocPage = {
       id: newId,
       title: newPageTitle,
-      content: `<h2>📋 ${newPageTitle}</h2><hr/><p>Start typing content for ${newPageTitle} directly here...</p>`
+      content: `<h2>${newPageTitle}</h2><hr/><p>Start typing content for ${newPageTitle} directly here...</p>`
     };
     setPages(prev => [...prev, newPageObj]);
     setNewPageTitle('');
     logAudit(`Added BA Document Page: "${newPageTitle}"`);
     setTimeout(() => scrollToSection(newId), 100);
-  };
-
-  const handleAddNewQaSuite = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newQaSuiteTitle.trim()) return;
-    const newId = `qa-suite-${Date.now()}`;
-    setQaSuites(prev => [...prev, {
-      id: newId,
-      title: newQaSuiteTitle,
-      jiraTicket: `JIRA-${Math.floor(100 + Math.random() * 900)}`,
-      testCases: []
-    }]);
-    setNewQaSuiteTitle('');
-    logAudit(`Added QA Test Suite: "${newQaSuiteTitle}"`);
-    setTimeout(() => scrollToSection(newId), 100);
-  };
-
-  const handleAddTestCaseToSuite = (suiteId: string) => {
-    if (!tcDescription.trim()) return;
-    setQaSuites(prev => prev.map(suite => {
-      if (suite.id === suiteId) {
-        const newCase: TestCase = {
-          id: `TEST-00${suite.testCases.length + 1}`,
-          description: tcDescription,
-          preconditions: tcPreconditions || '—',
-          expectedResult: tcExpectedResult || '—',
-          status: tcStatus,
-        };
-        return { ...suite, testCases: [...suite.testCases, newCase] };
-      }
-      return suite;
-    }));
-
-    logAudit(`Added test case to suite.`);
-    setTcDescription('');
-    setTcPreconditions('');
-    setTcExpectedResult('');
-    setTcStatus('PENDING');
-  };
-
-  const handleStatusChange = (suiteId: string, caseId: string, newStatus: 'PASSED' | 'FAILED' | 'PENDING') => {
-    setQaSuites(prev => prev.map(suite => {
-      if (suite.id === suiteId) {
-        return {
-          ...suite,
-          testCases: suite.testCases.map(c => c.id === caseId ? { ...c, status: newStatus } : c)
-        };
-      }
-      return suite;
-    }));
-    logAudit(`Updated test case status to ${newStatus}`);
-  };
-
-  const handleDeleteTestCase = (suiteId: string, caseId: string) => {
-    setQaSuites(prev => prev.map(suite => {
-      if (suite.id === suiteId) {
-        return {
-          ...suite,
-          testCases: suite.testCases.filter(c => c.id !== caseId)
-        };
-      }
-      return suite;
-    }));
-    logAudit(`Deleted test case ${caseId}`);
   };
 
   const updateSpecField = (field: keyof ProjectSpecs, value: string) => {
@@ -249,7 +145,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
     logAudit(`Removed tag: "${tagToRemove}"`);
   };
 
-  const handleAiGenerate = async (promptText: string) => {
+  const handleAiGenerate = async (_promptText: string) => {
     if (pages.length === 0) {
       alert("Please create at least one BA Page to append AI requirements!");
       return;
@@ -258,7 +154,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
     await new Promise((resolve) => setTimeout(resolve, 1500));
     
     const aiResponse = `
-<h3>✨ AI Generated Requirement Additions</h3>
+<h3>AI Generated Requirement Additions</h3>
 <ul>
   <li><strong>Functional Rule:</strong> The system must enforce high-security inputs before parsing data.</li>
   <li><strong>QA Assertion:</strong> Verify transaction latency returns sub-200ms payloads under peak loads.</li>
@@ -377,7 +273,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
         </head>
         <body>
           <div class="no-print-banner">
-            🖨️ Press <strong style="text-decoration: underline;">Ctrl + P</strong> and choose 'Save as PDF' to generate the official document bundle.
+            Press <strong>Ctrl + P</strong> and choose 'Save as PDF' to generate the official document bundle.
           </div>
           <div class="document-canvas">${pageHtmlSections}</div>
         </body>
@@ -401,10 +297,10 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
           <span className="text-xs text-slate-300 dark:text-slate-600">|</span>
           
           <button 
-            onClick={() => setIsAiPanelOpen(!isAiPanelOpen)}
+            onClick={() => setIsNavOpen(!isNavOpen)}
             className="px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
           >
-            {isAiPanelOpen ? '⬅️ Collapse Nav' : '📂 Open Doc Nav'}
+            {isNavOpen ? 'Collapse Nav' : 'Open Doc Nav'}
           </button>
         </div>
 
@@ -412,23 +308,23 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
           <div className="flex bg-slate-100 dark:bg-neutral-cardDark/80 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
             <button 
               onClick={() => setEditorMode('visual')}
-              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'visual' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'visual' ? 'bg-[#10065F] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
             >
-              🎨 Visual Mode
+              Visual Mode
             </button>
             <button 
               onClick={() => setEditorMode('code')}
-              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'code' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'code' ? 'bg-[#10065F] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
             >
-              💻 HTML Code Mode
+              HTML Code Mode
             </button>
           </div>
 
           <button 
             onClick={handleExportDoc}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
           >
-            📄 Save as Docs / PDF
+            Save as Docs / PDF
           </button>
         </div>
       </div>
@@ -436,7 +332,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
       <div className="flex-1 flex overflow-hidden">
         
         {/* Left Side Navigation Panel */}
-        {isAiPanelOpen && (
+        {isNavOpen && (
           <div className="w-72 bg-white dark:bg-neutral-cardDark/60 border-r border-slate-100 dark:border-slate-800/80 p-5 flex flex-col justify-between overflow-y-auto transition-all space-y-6">
             <div className="space-y-6">
               
@@ -450,9 +346,9 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     <button
                       key={p.id}
                       onClick={() => scrollToSection(p.id)}
-                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-neutral-obsidian/40 border-l-2 border-transparent hover:border-blue-500 transition-all block truncate cursor-pointer"
+                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-neutral-obsidian/40 border-l-2 border-transparent hover:border-[#10065F] transition-all block truncate cursor-pointer"
                     >
-                      📄 {p.title}
+                      {p.title}
                     </button>
                   ))}
                   {pages.length === 0 && (
@@ -468,39 +364,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     placeholder="Add BA Page..."
                     className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
                   />
-                  <button type="submit" className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-extrabold cursor-pointer">＋</button>
-                </form>
-              </div>
-
-              {/* QA Test Suites */}
-              <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4">
-                <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
-                  QA Test Suites
-                </h3>
-                <div className="space-y-1 mb-3">
-                  {qaSuites.map((suite) => (
-                    <button
-                      key={suite.id}
-                      onClick={() => scrollToSection(suite.id)}
-                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 border-l-2 border-transparent hover:border-emerald-500 transition-all block truncate cursor-pointer"
-                    >
-                      🧪 {suite.title}
-                    </button>
-                  ))}
-                  {qaSuites.length === 0 && (
-                    <p className="text-[10px] italic text-slate-400 p-2 bg-slate-50 dark:bg-neutral-obsidian/20 rounded-lg text-center font-semibold text-emerald-500/80">No QA suites created.</p>
-                  )}
-                </div>
-
-                <form onSubmit={handleAddNewQaSuite} className="flex space-x-1">
-                  <input 
-                    type="text"
-                    value={newQaSuiteTitle}
-                    onChange={(e) => setNewQaSuiteTitle(e.target.value)}
-                    placeholder="Add QA Suite..."
-                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
-                  />
-                  <button type="submit" className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-extrabold cursor-pointer">＋</button>
+                  <button type="submit" className="px-2.5 py-1.5 bg-[#10065F] hover:bg-[#180A8C] text-white rounded-lg text-xs font-extrabold cursor-pointer">+</button>
                 </form>
               </div>
 
@@ -513,7 +377,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                   {wordTags.map((tag) => (
                     <span 
                       key={tag} 
-                      className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-500 dark:text-blue-400 text-[10px] font-extrabold gap-1"
+                      className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/10 text-[#10065F] dark:text-blue-400 text-[10px] font-extrabold gap-1"
                     >
                       #{tag}
                       <button 
@@ -534,7 +398,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     placeholder="Add tag..."
                     className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
                   />
-                  <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-extrabold cursor-pointer">＋</button>
+                  <button type="submit" className="px-3 py-1.5 bg-[#10065F] hover:bg-[#180A8C] text-white rounded-lg text-xs font-extrabold cursor-pointer">+</button>
                 </form>
               </div>
 
@@ -552,9 +416,9 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                 <button
                   disabled={isGenerating || !aiPrompt.trim()}
                   onClick={() => handleAiGenerate(aiPrompt)}
-                  className="w-full py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-extrabold disabled:opacity-50 cursor-pointer"
+                  className="w-full py-2 rounded-xl bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-extrabold disabled:opacity-50 cursor-pointer shadow-sm transition-all"
                 >
-                  {isGenerating ? '⏳ Appending...' : '✨ Append to Document'}
+                  {isGenerating ? 'Appending...' : 'Append to Document'}
                 </button>
               </div>
 
@@ -611,7 +475,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                 className="bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-slate-800/60 rounded-xl shadow-md p-10 min-h-[500px] flex flex-col transition-all"
               >
                 <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/40 pb-2 mb-6">
-                  <span className="text-[10px] font-black tracking-widest text-blue-500 uppercase">📄 Section: {p.title}</span>
+                  <span className="text-[10px] font-black tracking-widest text-[#10065F] dark:text-blue-400 uppercase">Section: {p.title}</span>
                   <span className="text-[9px] text-slate-400">Word-count aware</span>
                 </div>
 
@@ -634,234 +498,11 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
               </div>
             ))}
 
-            {/* QA Test Suites Render - Full Detailed View Matching Standalone Page */}
-            {qaSuites.map((suite) => {
-              const totalCases = suite.testCases.length;
-              const passedCases = suite.testCases.filter(c => c.status === 'PASSED').length;
-              const failedCases = suite.testCases.filter(c => c.status === 'FAILED').length;
-              const passRate = totalCases > 0 ? Math.round((passedCases / totalCases) * 100) : 0;
-
-              return (
-                <div 
-                  key={suite.id}
-                  id={suite.id}
-                  ref={el => { sectionRefs.current[suite.id] = el; }}
-                  className="scroll-mt-6 space-y-6"
-                >
-                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    
-                    {/* Left Sidebar Suite Info Card */}
-                    <div className="space-y-4">
-                      <div className="bg-white dark:bg-neutral-cardDark p-5 rounded-2xl border border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-amber-500/10 text-amber-500">
-                            WITH JIRA TICKET
-                          </span>
-                          <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-red-500/10 text-red-500">
-                            HIGH
-                          </span>
-                        </div>
-
-                        <h2 className="text-xl font-black text-slate-800 dark:text-white">
-                          {suite.title}
-                        </h2>
-
-                        <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
-                          <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500">
-                            JIRA: {suite.jiraTicket || 'ASPD-211'} ↗
-                          </span>
-                          <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">
-                            Project: {projectSpecs.name}
-                          </span>
-                          <span className="px-2 py-1 rounded bg-purple-500/10 text-purple-400">
-                            QA: {projectSpecs.qaAssignee}
-                          </span>
-                        </div>
-
-                        <div className="pt-2 space-y-2">
-                          <button className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase transition-all cursor-pointer">
-                            EDIT SUITE SPECS
-                          </button>
-                          <button className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md cursor-pointer">
-                            AUTO-GENERATE TEST REPORT
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Attachments Gallery */}
-                      <div className="bg-white dark:bg-neutral-cardDark p-5 rounded-2xl border border-slate-200 dark:border-neutral-800 space-y-3 shadow-sm">
-                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
-                          ATTACHMENTS GALLERY ({suite.testCases.flatMap(c => c.attachments || []).length})
-                        </h3>
-                        <div className="space-y-2">
-                          {suite.testCases
-                            .flatMap(c => (c.attachments || []).map(att => ({ ...att, caseId: c.id })))
-                            .map((file, idx) => (
-                              <div key={idx} className="flex justify-between items-center text-xs p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                                <span className="font-mono text-[10px] text-blue-500 font-bold truncate max-w-[100px]">
-                                  {file.caseId}: {file.name}
-                                </span>
-                                <div className="space-x-1">
-                                  <button className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-bold">Preview</button>
-                                  <button className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold">Download</button>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right Main Column */}
-                    <div className="lg:col-span-3 space-y-6">
-                      
-                      {/* Stats Bar */}
-                      <div className="grid grid-cols-4 gap-4">
-                        <div className="bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200 dark:border-neutral-800 text-center">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">TOTAL CASES</span>
-                          <span className="text-2xl font-black text-slate-800 dark:text-white">{totalCases}</span>
-                        </div>
-                        <div className="bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200 dark:border-neutral-800 text-center">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 block">PASSED</span>
-                          <span className="text-2xl font-black text-emerald-500">{passedCases}</span>
-                        </div>
-                        <div className="bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200 dark:border-neutral-800 text-center">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-red-500 block">FAILED</span>
-                          <span className="text-2xl font-black text-red-500">{failedCases}</span>
-                        </div>
-                        <div className="bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200 dark:border-neutral-800 text-center">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-blue-500 block">PASS RATE</span>
-                          <span className="text-2xl font-black text-blue-500">{passRate}%</span>
-                        </div>
-                      </div>
-
-                      {/* Add New Test Case Form */}
-                      <div className="bg-white dark:bg-neutral-cardDark p-6 rounded-2xl border border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
-                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
-                          ADD NEW TEST CASE
-                        </h3>
-
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          <input
-                            type="text"
-                            placeholder="Description..."
-                            value={tcDescription}
-                            onChange={(e) => setTcDescription(e.target.value)}
-                            className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white outline-none"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Preconditions..."
-                            value={tcPreconditions}
-                            onChange={(e) => setTcPreconditions(e.target.value)}
-                            className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white outline-none"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Expected Result..."
-                            value={tcExpectedResult}
-                            onChange={(e) => setTcExpectedResult(e.target.value)}
-                            className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white outline-none"
-                          />
-                          <select
-                            value={tcStatus}
-                            onChange={(e: any) => setTcStatus(e.target.value)}
-                            className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-bold outline-none cursor-pointer"
-                          >
-                            <option value="PENDING">PENDING</option>
-                            <option value="PASSED">PASSED</option>
-                            <option value="FAILED">FAILED</option>
-                          </select>
-                        </div>
-
-                        {/* File Dropzone */}
-                        <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center space-y-1 hover:border-blue-500 transition-all cursor-pointer">
-                          <p className="text-xs font-bold text-blue-500">
-                            Drag and drop screenshot/video files here, or click to browse
-                          </p>
-                          <p className="text-[10px] text-slate-400">Supported formats: PNG, JPG, MP4, WebM</p>
-                        </div>
-
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => handleAddTestCaseToSuite(suite.id)}
-                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md cursor-pointer"
-                          >
-                            + ADD TEST CASE
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Test Cases Table */}
-                      <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200 dark:border-neutral-800 overflow-hidden shadow-sm">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-[10px] uppercase font-black text-slate-400">
-                            <tr>
-                              <th className="p-4">TEST CASE ID</th>
-                              <th className="p-4">DESCRIPTION</th>
-                              <th className="p-4">PRECONDITIONS</th>
-                              <th className="p-4">EXPECTED RESULT</th>
-                              <th className="p-4">ATTACHMENTS</th>
-                              <th className="p-4">STATUS</th>
-                              <th className="p-4 text-right">ACTIONS</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                            {suite.testCases.map((tc) => (
-                              <tr key={tc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
-                                <td className="p-4 font-mono font-bold text-blue-500">{tc.id}</td>
-                                <td className="p-4 font-bold text-slate-800 dark:text-white">{tc.description}</td>
-                                <td className="p-4 text-slate-400">{tc.preconditions}</td>
-                                <td className="p-4 text-slate-700 dark:text-slate-300">{tc.expectedResult}</td>
-                                <td className="p-4">
-                                  {tc.attachments && tc.attachments.length > 0 ? (
-                                    <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-blue-400">
-                                      {tc.attachments[0].name} +
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 italic text-[10px]">None</span>
-                                  )}
-                                </td>
-                                <td className="p-4">
-                                  <select
-                                    value={tc.status}
-                                    onChange={(e: any) => handleStatusChange(suite.id, tc.id, e.target.value)}
-                                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase outline-none cursor-pointer ${
-                                      tc.status === 'PASSED'
-                                        ? 'bg-emerald-500/10 text-emerald-500'
-                                        : tc.status === 'FAILED'
-                                        ? 'bg-red-500/10 text-red-500'
-                                        : 'bg-amber-500/10 text-amber-500'
-                                    }`}
-                                  >
-                                    <option value="PASSED">PASSED</option>
-                                    <option value="FAILED">FAILED</option>
-                                    <option value="PENDING">PENDING</option>
-                                  </select>
-                                </td>
-                                <td className="p-4 text-right space-x-2">
-                                  <button className="text-amber-500 hover:underline font-bold text-[10px] uppercase">Edit</button>
-                                  <button onClick={() => handleDeleteTestCase(suite.id, tc.id)} className="text-red-500 hover:underline font-bold text-[10px] uppercase">Delete</button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                    </div>
-
-                  </div>
-                </div>
-              );
-            })}
-
-            {pages.length === 0 && qaSuites.length === 0 && (
+            {pages.length === 0 && (
               <div className="bg-white dark:bg-neutral-cardDark border border-dashed border-slate-200 dark:border-slate-700/80 rounded-xl p-16 text-center shadow-sm">
-                <span className="text-4xl">📂</span>
                 <h3 className="text-sm font-bold text-brand-paramount dark:text-white mt-3">Clean Workspace Initialized</h3>
                 <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                  This project directory is currently empty. Use the sidebar on the left to add your first BA document page or QA execution suite!
+                  This project directory is currently empty. Use the sidebar on the left to add your first BA document page.
                 </p>
               </div>
             )}
@@ -885,7 +526,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                   type="text" 
                   value={projectSpecs.name}
                   onChange={(e) => updateSpecField('name', e.target.value)}
-                  className="w-full bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-extrabold text-brand-paramount dark:text-white pb-1"
+                  className="w-full bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-[#10065F] outline-none font-extrabold text-brand-paramount dark:text-white pb-1"
                 />
               </div>
               
@@ -895,7 +536,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                 <textarea 
                   value={projectSpecs.description}
                   onChange={(e) => updateSpecField('description', e.target.value)}
-                  className="w-full h-14 bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none text-slate-500 dark:text-slate-300 font-semibold leading-relaxed resize-none"
+                  className="w-full h-14 bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-[#10065F] outline-none text-slate-500 dark:text-slate-300 font-semibold leading-relaxed resize-none"
                 />
               </div>
 
@@ -907,7 +548,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     type="date" 
                     value={projectSpecs.commenced}
                     onChange={(e) => updateSpecField('commenced', e.target.value)}
-                    className="w-full bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-brand-paramount dark:text-white"
+                    className="w-full bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-[#10065F] outline-none font-bold text-brand-paramount dark:text-white"
                   />
                 </div>
                 <div>
@@ -916,7 +557,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     type="date" 
                     value={projectSpecs.due}
                     onChange={(e) => updateSpecField('due', e.target.value)}
-                    className="w-full bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-red-500"
+                    className="w-full bg-transparent border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-[#10065F] outline-none font-bold text-red-500"
                   />
                 </div>
               </div>
@@ -929,7 +570,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     type="text" 
                     value={projectSpecs.baAssigned}
                     onChange={(e) => updateSpecField('baAssigned', e.target.value)}
-                    className="bg-transparent text-right border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-brand-paramount dark:text-slate-200 w-32"
+                    className="bg-transparent text-right border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-[#10065F] outline-none font-bold text-brand-paramount dark:text-slate-200 w-32"
                   />
                 </div>
                 <div className="flex justify-between items-center">
@@ -938,7 +579,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     type="text" 
                     value={projectSpecs.qaAssignee}
                     onChange={(e) => updateSpecField('qaAssignee', e.target.value)}
-                    className="bg-transparent text-right border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-brand-paramount dark:text-slate-200 w-32"
+                    className="bg-transparent text-right border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-[#10065F] outline-none font-bold text-brand-paramount dark:text-slate-200 w-32"
                   />
                 </div>
                 <div className="flex justify-between items-center">
@@ -947,7 +588,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     type="text" 
                     value={projectSpecs.devAssignee}
                     onChange={(e) => updateSpecField('devAssignee', e.target.value)}
-                    className="bg-transparent text-right border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-blue-500 outline-none font-bold text-brand-paramount dark:text-slate-200 w-32"
+                    className="bg-transparent text-right border-b border-dashed border-slate-200 dark:border-slate-700 focus:border-[#10065F] outline-none font-bold text-brand-paramount dark:text-slate-200 w-32"
                   />
                 </div>
               </div>
@@ -976,7 +617,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                         onClick={() => updateSpecField('progress', track)}
                         className={`px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-tight transition-all cursor-pointer ${
                           projectSpecs.progress === track
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-[#10065F] text-white'
                             : 'bg-slate-100 dark:bg-neutral-obsidian/60 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                         }`}
                       >
