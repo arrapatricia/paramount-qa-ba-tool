@@ -231,7 +231,6 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     return { label: 'QA IN PROGRESS', style: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30' };
   };
 
-  // Direct PDF Print/Save Pop-up Trigger
   const handleExportReportPDF = () => {
     if (!activeMatrixSuite) return;
     const printWindow = window.open('', '_blank', 'width=900,height=800');
@@ -337,7 +336,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
               <div style="background: #10065F; color: white; padding: 8px 12px; font-weight: 900; font-size: 12px;">1</div>
               <div style="padding: 8px 12px; font-size: 10px; font-weight: bold; color: #334155; border-left: 1px solid #0f172a; flex: 1;">
                 QA Team | Systems and Development<br />
-                Paramount Life & General Insurance Corp.
+                Paramount Life & General Insurance Inc.
               </div>
             </div>
           </div>
@@ -757,7 +756,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[calc(100vh-73px)] items-center justify-center">
+      <div className="flex min-h-[calc(100vh-73px)] items-center justify-center p-4">
         <div className="w-8 h-8 border-4 border-[#10065F] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -771,24 +770,24 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     const linkedSuiteObjs = activeSuites.filter(s => activePlanView.linkedSuites.includes(String(s.id)));
 
     return (
-      <div className={`p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
-        <div className="w-full px-4 mx-auto space-y-6">
+      <div className={`p-4 md:p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
+        <div className="w-full px-0 md:px-4 mx-auto space-y-6">
           
           <div className="flex items-center justify-between">
             <button
               onClick={() => setActivePlanView(null)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-neutral-cardDark text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-sm"
+              className="flex items-center space-x-2 px-3 py-2 md:px-4 md:py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-neutral-cardDark text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-sm"
             >
               <span>← Back to Test Plans</span>
             </button>
-            <span className="font-mono text-xs font-semibold text-slate-400">/{planSlug}</span>
+            <span className="font-mono text-[10px] md:text-xs font-semibold text-slate-400 truncate max-w-[150px] md:max-w-none">/{planSlug}</span>
           </div>
 
-          <div className="p-6 rounded-2xl bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="p-4 md:p-6 rounded-2xl bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-2">
-              <div className="flex items-center space-x-3">
+              <div className="flex flex-wrap items-center gap-2 md:gap-3">
                 <span className="font-mono text-sm font-black text-[#10065F] dark:text-blue-400">{activePlanView.planId}</span>
-                <h1 className="text-2xl font-black text-slate-800 dark:text-white">
+                <h1 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white">
                   {activePlanView.title}
                 </h1>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
@@ -801,16 +800,16 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
               <p className="text-xs text-slate-400">Target Release Version: <strong className="text-slate-700 dark:text-slate-200 font-bold">{activePlanView.targetRelease}</strong></p>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
               <button
                 onClick={() => handleOpenEditPlan(activePlanView)}
-                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-xs border border-slate-200 dark:border-slate-700"
+                className="flex-1 md:flex-none px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-xs border border-slate-200 dark:border-slate-700 text-center"
               >
                 EDIT TEST PLAN
               </button>
               <button
                 onClick={() => handleArchivePlan(activePlanView.id)}
-                className="px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                className="flex-1 md:flex-none px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-center"
               >
                 ARCHIVE PLAN
               </button>
@@ -823,29 +822,29 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
             </h2>
 
             {linkedSuiteObjs.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 {linkedSuiteObjs.map((suite) => {
                   const assignedProjectName = getProjectName(suite.project_id);
                   return (
                     <div 
                       key={suite.id}
                       onClick={() => handleOpenSuitePage(suite)}
-                      className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all cursor-pointer group"
+                      className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-5 md:p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all cursor-pointer group"
                     >
                       <div>
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <h3 className="font-extrabold text-lg text-slate-800 dark:text-white group-hover:text-[#10065F] dark:group-hover:text-blue-400 transition-colors">
+                            <h3 className="font-extrabold text-base md:text-lg text-slate-800 dark:text-white group-hover:text-[#10065F] dark:group-hover:text-blue-400 transition-colors">
                               {suite.title}
                             </h3>
-                            <div className="flex flex-wrap gap-2 mt-1">
+                            <div className="flex flex-wrap gap-1.5 md:gap-2 mt-1">
                               {suite.jira_ticket && (
                                 <a 
                                   href={getJiraUrl(suite.jira_ticket)}
                                   target="_blank"
                                   rel="noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-all cursor-pointer"
+                                  className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-all cursor-pointer"
                                 >
                                   <span>JIRA: {suite.jira_ticket}</span>
                                   <span className="text-[9px]">↗</span>
@@ -853,19 +852,19 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                               )}
 
                               {assignedProjectName && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
                                   Project: {assignedProjectName}
                                 </span>
                               )}
 
                               {suite.assigned_qa && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400">
                                   QA: {suite.assigned_qa}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                          <span className={`px-2 py-0.5 md:px-2.5 md:py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
                             suite.priority === 'Critical' ? 'bg-red-500/10 text-red-500' :
                             suite.priority === 'High' ? 'bg-orange-500/10 text-orange-500' :
                             suite.priority === 'Medium' ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-500/10 text-slate-400'
@@ -891,7 +890,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 })}
               </div>
             ) : (
-              <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 p-12 text-center text-slate-400 text-xs italic">
+              <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 p-8 md:p-12 text-center text-slate-400 text-xs italic">
                 No test suites linked to this plan yet. Click "EDIT TEST PLAN" above to select suites.
               </div>
             )}
@@ -903,7 +902,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
   }
 
   // =====================================================================
-  // DEDICATED FULL-PAGE MATRIX VIEW FOR /name_of_test_suite (FULL WIDTH WITH ADJUSTABLE SIDEBARS)
+  // DEDICATED FULL-PAGE MATRIX VIEW FOR /name_of_test_suite (MOBILE RESPONSIVE & FLEXIBLE)
   // =====================================================================
   if (activeMatrixSuite) {
     const slugName = activeMatrixSuite.title.toLowerCase().replace(/[^a-z0-9]+/g, '_');
@@ -914,25 +913,25 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     const previewTestCases = testCases.slice(0, 10);
 
     return (
-      <div className={`p-6 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
+      <div className={`p-4 md:p-6 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
         <div className="w-full space-y-4">
           
           <div className="flex items-center justify-between">
             <button
               onClick={() => setActiveMatrixSuite(null)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-neutral-cardDark text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-sm"
+              className="flex items-center space-x-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-neutral-cardDark text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-sm"
             >
               <span>← Back to Test Suites</span>
             </button>
-            <span className="font-mono text-xs font-semibold text-slate-400">/{slugName}</span>
+            <span className="font-mono text-[10px] md:text-xs font-semibold text-slate-400 truncate max-w-[150px] md:max-w-none">/{slugName}</span>
           </div>
 
-          <div className="flex items-start w-full relative">
+          <div className="flex flex-col lg:flex-row items-start w-full gap-4 lg:gap-0 relative">
             
             {/* 1️⃣ LEFT ADJUSTABLE SIDEBAR: TEST CASE INDEX */}
             <div 
-              style={{ width: `${leftNavWidth}px` }} 
-              className="bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-sm space-y-3 shrink-0 relative"
+              style={{ width: window.innerWidth >= 1024 ? `${leftNavWidth}px` : '100%' }} 
+              className="w-full lg:w-auto bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-sm space-y-3 shrink-0 relative"
             >
               <div className="border-b border-slate-100 dark:border-slate-800/80 pb-2">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-white">
@@ -941,7 +940,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 <p className="text-[10px] text-slate-400 font-medium">Click ID to jump directly</p>
               </div>
 
-              <div className="space-y-1.5 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-48 lg:max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
                 {testCases.map((tc) => (
                   <button
                     key={tc.id}
@@ -971,42 +970,42 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
               </div>
             </div>
 
-            {/* LEFT DRAG HANDLE */}
+            {/* LEFT DRAG HANDLE (DESKTOP ONLY) */}
             <div
               onMouseDown={() => { isDraggingLeft.current = true; document.body.style.cursor = 'col-resize'; }}
-              className="w-3 hover:w-3 cursor-col-resize self-stretch flex items-center justify-center group z-10 mx-1"
+              className="hidden lg:flex w-3 hover:w-3 cursor-col-resize self-stretch items-center justify-center group z-10 mx-1"
             >
               <div className="w-1 h-12 bg-slate-300 dark:bg-slate-700 rounded-full group-hover:bg-[#10065F] transition-all"></div>
             </div>
 
-            {/* 2️⃣ CENTER WORKSPACE (EXPANDS TO FILL PAGE SPACE) */}
-            <div className="flex-1 space-y-6 min-w-0 px-2">
+            {/* 2️⃣ CENTER WORKSPACE */}
+            <div className="flex-1 w-full space-y-4 md:space-y-6 min-w-0 lg:px-2">
               
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-neutral-cardDark p-3 rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 bg-white dark:bg-neutral-cardDark p-3 rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-sm">
                 <div className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800/80 text-center">
                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">Total Cases</span>
-                  <span className="text-lg font-black text-slate-800 dark:text-white block mt-0.5">{totalCases}</span>
+                  <span className="text-base md:text-lg font-black text-slate-800 dark:text-white block mt-0.5">{totalCases}</span>
                 </div>
 
                 <div className="px-3 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
                   <span className="text-[9px] font-black uppercase text-green-500 tracking-wider block">Passed</span>
-                  <span className="text-lg font-black text-green-500 block mt-0.5">{passedCases}</span>
+                  <span className="text-base md:text-lg font-black text-green-500 block mt-0.5">{passedCases}</span>
                 </div>
 
                 <div className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
                   <span className="text-[9px] font-black uppercase text-red-500 tracking-wider block">Failed</span>
-                  <span className="text-lg font-black text-red-500 block mt-0.5">{failedCases}</span>
+                  <span className="text-base md:text-lg font-black text-red-500 block mt-0.5">{failedCases}</span>
                 </div>
 
                 <div className="px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center flex flex-col justify-between">
                   <div>
                     <span className="text-[9px] font-black uppercase text-blue-500 tracking-wider block">Pass Rate</span>
-                    <span className="text-lg font-black text-blue-500 block mt-0.5">{passingRate}%</span>
+                    <span className="text-base md:text-lg font-black text-blue-500 block mt-0.5">{passingRate}%</span>
                   </div>
                 </div>
               </div>
 
-              <form onSubmit={handleSaveTestCase} className="bg-white dark:bg-neutral-cardDark p-5 rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-sm space-y-4">
+              <form onSubmit={handleSaveTestCase} className="bg-white dark:bg-neutral-cardDark p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-sm space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-black uppercase tracking-wider text-slate-400 block">
                     {editingCaseId ? 'Edit Test Case' : 'Add New Test Case'}
@@ -1021,7 +1020,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 text-xs">
                   <div className="flex flex-col justify-center px-3 py-2 rounded-xl border border-blue-500/30 bg-blue-500/10 text-[#10065F] dark:text-blue-400 font-mono font-black text-xs select-none">
                     <span className="text-[8px] uppercase tracking-wider text-slate-400 font-sans block">Auto ID</span>
                     {editingCaseId ? testCases.find(c => c.id === editingCaseId)?.testCaseId : getNextTestCaseId()}
@@ -1120,7 +1119,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 <div className="flex justify-end pt-1">
                   <button 
                     type="submit"
-                    className={`px-5 py-2.5 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow cursor-pointer transition-all ${
+                    className={`w-full sm:w-auto px-5 py-2.5 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow cursor-pointer transition-all ${
                       editingCaseId ? 'bg-amber-600 hover:bg-amber-500' : 'bg-[#10065F] hover:bg-[#180A8C]'
                     }`}
                   >
@@ -1129,29 +1128,29 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 </div>
               </form>
 
-              {/* TABLE MATRIX */}
-              <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 overflow-hidden shadow-sm space-y-0">
-                <table className="w-full text-left border-collapse text-xs">
+              {/* TABLE MATRIX WITH HORIZONTAL SCROLL FOR MOBILE */}
+              <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 overflow-x-auto shadow-sm space-y-0">
+                <table className="w-full text-left border-collapse text-xs min-w-[650px]">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-[10px] uppercase tracking-widest text-slate-400 font-black">
-                      <th className="p-4">Test Case ID</th>
-                      <th className="p-4">Description</th>
-                      <th className="p-4">Preconditions</th>
-                      <th className="p-4">Expected Result</th>
-                      <th className="p-4">Attachments</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
+                      <th className="p-3 md:p-4">Test Case ID</th>
+                      <th className="p-3 md:p-4">Description</th>
+                      <th className="p-3 md:p-4">Preconditions</th>
+                      <th className="p-3 md:p-4">Expected Result</th>
+                      <th className="p-3 md:p-4">Attachments</th>
+                      <th className="p-3 md:p-4">Status</th>
+                      <th className="p-3 md:p-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
                     {previewTestCases.map((tc) => (
                       <tr id={`tc-row-${tc.id}`} key={tc.id} className={`hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-all ${editingCaseId === tc.id ? 'bg-amber-500/10' : ''}`}>
-                        <td className="p-4 font-mono font-black text-[#10065F] dark:text-blue-400">{tc.testCaseId}</td>
-                        <td className="p-4 font-semibold text-slate-800 dark:text-white">{tc.description}</td>
-                        <td className="p-4 text-slate-400 italic">{tc.preconditions || '—'}</td>
-                        <td className="p-4 text-slate-600 dark:text-slate-300">{tc.expectedResult}</td>
+                        <td className="p-3 md:p-4 font-mono font-black text-[#10065F] dark:text-blue-400 whitespace-nowrap">{tc.testCaseId}</td>
+                        <td className="p-3 md:p-4 font-semibold text-slate-800 dark:text-white">{tc.description}</td>
+                        <td className="p-3 md:p-4 text-slate-400 italic">{tc.preconditions || '—'}</td>
+                        <td className="p-3 md:p-4 text-slate-600 dark:text-slate-300">{tc.expectedResult}</td>
                         
-                        <td className="p-4">
+                        <td className="p-3 md:p-4">
                           {tc.attachments && tc.attachments.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                               {tc.attachments.map(att => (
@@ -1171,11 +1170,11 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                           )}
                         </td>
 
-                        <td className="p-4">
+                        <td className="p-3 md:p-4">
                           <select 
                             value={tc.status}
                             onChange={(e: any) => handleStatusChange(tc.id, e.target.value)}
-                            className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border-0 cursor-pointer outline-none ${
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border-0 cursor-pointer outline-none ${
                               tc.status === 'Passed' ? 'bg-green-500/10 text-green-500' :
                               tc.status === 'Failed' ? 'bg-red-500/10 text-red-500' :
                               tc.status === 'On Hold' ? 'bg-amber-500/10 text-amber-500' : 'bg-slate-500/10 text-slate-400'
@@ -1187,7 +1186,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                             <option value="On Hold" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">ON HOLD</option>
                           </select>
                         </td>
-                        <td className="p-4 text-right space-x-3">
+                        <td className="p-3 md:p-4 text-right space-x-2 md:space-x-3 whitespace-nowrap">
                           <button 
                             onClick={() => handleStartEdit(tc)}
                             className="text-amber-500 hover:underline font-extrabold uppercase text-[10px] cursor-pointer"
@@ -1219,7 +1218,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                       onClick={() => setIsViewAllModalOpen(true)}
                       className="px-4 py-2 rounded-xl bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
                     >
-                      VIEW ALL {testCases.length} TEST CASES →
+                      VIEW ALL {testCases.length} TEST CASES IN EXPANDED MODAL →
                     </button>
                   </div>
                 )}
@@ -1227,21 +1226,21 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
             </div>
 
-            {/* RIGHT DRAG HANDLE */}
+            {/* RIGHT DRAG HANDLE (DESKTOP ONLY) */}
             <div
               onMouseDown={() => { isDraggingRight.current = true; document.body.style.cursor = 'col-resize'; }}
-              className="w-3 hover:w-3 cursor-col-resize self-stretch flex items-center justify-center group z-10 mx-1"
+              className="hidden lg:flex w-3 hover:w-3 cursor-col-resize self-stretch items-center justify-center group z-10 mx-1"
             >
               <div className="w-1 h-12 bg-slate-300 dark:bg-slate-700 rounded-full group-hover:bg-[#10065F] transition-all"></div>
             </div>
 
             {/* 3️⃣ RIGHT ADJUSTABLE SIDEBAR: SPECS & AUDIT TRAIL */}
             <div 
-              style={{ width: `${rightNavWidth}px` }} 
-              className="space-y-6 shrink-0 font-sans"
+              style={{ width: window.innerWidth >= 1024 ? `${rightNavWidth}px` : '100%' }} 
+              className="w-full lg:w-auto space-y-4 md:space-y-6 shrink-0 font-sans"
             >
               
-              <div className="p-6 rounded-2xl bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800 shadow-sm space-y-4">
+              <div className="p-5 md:p-6 rounded-2xl bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800 shadow-sm space-y-4">
                 
                 <div className={`px-3 py-2 rounded-xl border text-center text-xs font-black uppercase tracking-wider ${overallStatus.style}`}>
                   {overallStatus.label}
@@ -1252,12 +1251,12 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/10 text-blue-500 inline-block mb-1">
                       {activeMatrixSuite.suite_type || 'Adhoc'}
                     </span>
-                    <h1 className="text-xl font-black text-slate-800 dark:text-white leading-tight">
+                    <h1 className="text-lg md:text-xl font-black text-slate-800 dark:text-white leading-tight">
                       {activeMatrixSuite.title}
                     </h1>
                   </div>
 
-                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shrink-0 ${
+                  <span className={`px-2 py-0.5 md:px-2.5 md:py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shrink-0 ${
                     activeMatrixSuite.priority === 'Critical' ? 'bg-red-500/10 text-red-500' :
                     activeMatrixSuite.priority === 'High' ? 'bg-orange-500/10 text-orange-500' :
                     activeMatrixSuite.priority === 'Medium' ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-500/10 text-slate-400'
@@ -1332,7 +1331,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                           <span className="font-mono font-bold text-[10px] text-[#10065F] dark:text-blue-400 shrink-0">
                             {att.testCaseId}
                           </span>
-                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px]" title={att.name}>
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[120px]" title={att.name}>
                             {att.name}
                           </span>
                         </div>
@@ -1388,47 +1387,47 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
         {/* FULL EXPANDED SCROLL MODAL */}
         {isViewAllModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-6 z-50 animate-in fade-in duration-150">
-            <div className="w-full max-w-6xl max-h-[90vh] bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 flex flex-col space-y-4">
-              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/80 pb-3">
+          <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 md:p-6 z-50 animate-in fade-in duration-150">
+            <div className="w-full max-w-6xl max-h-[90vh] bg-white dark:bg-neutral-cardDark rounded-2xl p-4 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 flex flex-col space-y-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-100 dark:border-slate-800/80 pb-3 gap-2">
                 <div>
-                  <h3 className="text-base font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                  <h3 className="text-sm md:text-base font-black text-slate-800 dark:text-white uppercase tracking-wider">
                     {activeMatrixSuite.title} - All Test Cases ({testCases.length})
                   </h3>
-                  <p className="text-xs text-slate-400 font-medium">Full scrollable execution log view</p>
+                  <p className="text-[10px] md:text-xs text-slate-400 font-medium">Full scrollable execution log view</p>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 w-full md:w-auto">
                   <input
                     type="text"
                     placeholder="Search test cases..."
                     value={modalSearchFilter}
                     onChange={(e) => setModalSearchFilter(e.target.value)}
-                    className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white outline-none w-64"
+                    className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white outline-none w-full md:w-64"
                   />
                   <button onClick={() => setIsViewAllModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">✕</button>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl">
-                <table className="w-full text-left border-collapse text-xs">
+              <div className="flex-1 overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+                <table className="w-full text-left border-collapse text-xs min-w-[650px]">
                   <thead className="sticky top-0 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase font-black text-slate-500 z-10">
                     <tr>
-                      <th className="p-4">Test Case ID</th>
-                      <th className="p-4">Description</th>
-                      <th className="p-4">Preconditions</th>
-                      <th className="p-4">Expected Result</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
+                      <th className="p-3 md:p-4">Test Case ID</th>
+                      <th className="p-3 md:p-4">Description</th>
+                      <th className="p-3 md:p-4">Preconditions</th>
+                      <th className="p-3 md:p-4">Expected Result</th>
+                      <th className="p-3 md:p-4">Status</th>
+                      <th className="p-3 md:p-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
                     {modalFilteredCases.map((tc) => (
                       <tr key={tc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
-                        <td className="p-4 font-mono font-black text-[#10065F] dark:text-blue-400">{tc.testCaseId}</td>
-                        <td className="p-4 font-semibold text-slate-800 dark:text-white">{tc.description}</td>
-                        <td className="p-4 text-slate-400 italic">{tc.preconditions || '—'}</td>
-                        <td className="p-4 text-slate-600 dark:text-slate-300">{tc.expectedResult}</td>
-                        <td className="p-4">
+                        <td className="p-3 md:p-4 font-mono font-black text-[#10065F] dark:text-blue-400 whitespace-nowrap">{tc.testCaseId}</td>
+                        <td className="p-3 md:p-4 font-semibold text-slate-800 dark:text-white">{tc.description}</td>
+                        <td className="p-3 md:p-4 text-slate-400 italic">{tc.preconditions || '—'}</td>
+                        <td className="p-3 md:p-4 text-slate-600 dark:text-slate-300">{tc.expectedResult}</td>
+                        <td className="p-3 md:p-4">
                           <select 
                             value={tc.status}
                             onChange={(e: any) => handleStatusChange(tc.id, e.target.value)}
@@ -1443,7 +1442,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                             <option value="On Hold">ON HOLD</option>
                           </select>
                         </td>
-                        <td className="p-4 text-right space-x-3">
+                        <td className="p-3 md:p-4 text-right space-x-3 whitespace-nowrap">
                           <button onClick={() => { setIsViewAllModalOpen(false); handleStartEdit(tc); }} className="text-amber-500 hover:underline font-extrabold uppercase text-[10px] cursor-pointer">Edit</button>
                           <button onClick={() => handleDeleteTestCase(tc.id)} className="text-red-500 hover:underline font-extrabold uppercase text-[10px] cursor-pointer">Delete</button>
                         </td>
@@ -1458,7 +1457,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                   onClick={() => setIsViewAllModalOpen(false)}
                   className="px-5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold uppercase transition-all cursor-pointer"
                 >
-                  Close
+                  Close Modal
                 </button>
               </div>
             </div>
@@ -1470,7 +1469,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
             <div className="max-w-4xl w-full bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <span className="text-xs font-bold text-white uppercase tracking-wider">{previewMedia.name}</span>
+                <span className="text-xs font-bold text-white uppercase tracking-wider truncate max-w-[200px] md:max-w-none">{previewMedia.name}</span>
                 <div className="flex items-center space-x-3">
                   <a
                     href={previewMedia.url}
@@ -1496,7 +1495,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
         {/* EDIT SUITE SPECS MODAL */}
         {isEditSuiteModalOpen && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-            <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4">
+            <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-5 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4">
               <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3">
                 <div>
                   <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Edit Test Suite Specifications</h3>
@@ -1532,7 +1531,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                   <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Assigned QA Engineer</label>
                   <input
                     type="text" value={editAssignedQa} onChange={(e) => setEditAssignedQa(e.target.value)}
-                    placeholder="e.g., Arra Del Mundo"
+                    placeholder="e.g., Name of QA Assigned"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none"
                   />
                 </div>
@@ -1605,19 +1604,19 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
   }
 
   // =====================================================================
-  // MAIN GALLERY VIEW (TEST SUITES & TEST PLANS)
+  // MAIN GALLERY VIEW (TEST SUITES & TEST PLANS - MOBILE RESPONSIVE)
   // =====================================================================
   return (
-    <div className={`p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
-      <div className="w-full px-4 mx-auto space-y-8">
+    <div className={`p-4 md:p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
+      <div className="w-full px-0 md:px-4 mx-auto space-y-6 md:space-y-8">
         
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-800 dark:text-white">
               {activeTab === 'plans' 
                 ? (showPlanTrash ? 'Archived Test Plans' : 'Test Plans')
-                : (showSuiteTrash ? 'Archived Test Suites' : 'QA Test Suites')}
+                : (showSuiteTrash ? 'Archived Test Suites' : 'Test Suites')}
             </h1>
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-1">
               {activeTab === 'plans'
@@ -1626,33 +1625,33 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
             </p>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
             {/* Tab Switcher */}
-            <div className="flex gap-1 bg-slate-200/60 dark:bg-slate-900/60 p-1 rounded-2xl border border-slate-300/50 dark:border-slate-800">
+            <div className="flex gap-1 bg-slate-200/60 dark:bg-slate-900/60 p-1 rounded-2xl border border-slate-300/50 dark:border-slate-800 w-full md:w-auto">
               <button
                 onClick={() => setActiveTab('suites')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                className={`flex-1 md:flex-none px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   activeTab === 'suites' ? 'bg-[#10065F] text-white shadow-md' : 'text-slate-400 hover:text-slate-500'
                 }`}
               >
-                Test Suites ({activeSuites.length})
+                Suites ({activeSuites.length})
               </button>
               <button
                 onClick={() => setActiveTab('plans')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                className={`flex-1 md:flex-none px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   activeTab === 'plans' ? 'bg-[#10065F] text-white shadow-md' : 'text-slate-400 hover:text-slate-500'
                 }`}
               >
-                Test Plans ({activePlans.length})
+                Plans ({activePlans.length})
               </button>
             </div>
 
             {/* Test Suites Controls */}
             {activeTab === 'suites' && (
-              <>
+              <div className="flex items-center gap-2 w-full md:w-auto">
                 <button
                   onClick={() => setShowSuiteTrash(!showSuiteTrash)}
-                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex-1 md:flex-none px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                     showSuiteTrash 
                       ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500/20' 
                       : 'bg-slate-200/60 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300/60'
@@ -1664,20 +1663,20 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 {!showSuiteTrash && (
                   <button
                     onClick={() => setIsCreateModalOpen(true)}
-                    className="px-4 py-2.5 rounded-xl border border-blue-500/30 bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                    className="flex-1 md:flex-none px-4 py-2.5 rounded-xl border border-blue-500/30 bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer whitespace-nowrap"
                   >
-                    + CREATE TEST SUITE
+                    + CREATE SUITE
                   </button>
                 )}
-              </>
+              </div>
             )}
 
             {/* Test Plans Controls */}
             {activeTab === 'plans' && (
-              <>
+              <div className="flex items-center gap-2 w-full md:w-auto">
                 <button
                   onClick={() => setShowPlanTrash(!showPlanTrash)}
-                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex-1 md:flex-none px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                     showPlanTrash 
                       ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500/20' 
                       : 'bg-slate-200/60 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300/60'
@@ -1689,12 +1688,12 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 {!showPlanTrash && (
                   <button
                     onClick={() => setIsPlanModalOpen(true)}
-                    className="px-4 py-2.5 rounded-xl border border-blue-500/30 bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                    className="flex-1 md:flex-none px-4 py-2.5 rounded-xl border border-blue-500/30 bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer whitespace-nowrap"
                   >
-                    + CREATE TEST PLAN
+                    + CREATE PLAN
                   </button>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -1703,7 +1702,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
         {activeTab === 'suites' && (
           <>
             {displayedSuites.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 {displayedSuites.map((suite) => {
                   const assignedProjectName = getProjectName(suite.project_id);
                   const linkedPlans = getLinkedPlansForSuite(suite.id);
@@ -1712,22 +1711,22 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                     <div 
                       key={suite.id}
                       onClick={() => handleOpenSuitePage(suite)}
-                      className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all cursor-pointer group"
+                      className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-5 md:p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all cursor-pointer group"
                     >
                       <div>
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <h3 className="font-extrabold text-lg text-slate-800 dark:text-white group-hover:text-[#10065F] dark:group-hover:text-blue-400 transition-colors">
+                            <h3 className="font-extrabold text-base md:text-lg text-slate-800 dark:text-white group-hover:text-[#10065F] dark:group-hover:text-blue-400 transition-colors">
                               {suite.title}
                             </h3>
-                            <div className="flex flex-wrap gap-2 mt-1">
+                            <div className="flex flex-wrap gap-1.5 md:gap-2 mt-1">
                               {suite.jira_ticket && (
                                 <a 
                                   href={getJiraUrl(suite.jira_ticket)}
                                   target="_blank"
                                   rel="noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-all cursor-pointer"
+                                  className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-all cursor-pointer"
                                 >
                                   <span>JIRA: {suite.jira_ticket}</span>
                                   <span className="text-[9px]">↗</span>
@@ -1735,13 +1734,13 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                               )}
 
                               {assignedProjectName && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
                                   Project: {assignedProjectName}
                                 </span>
                               )}
 
                               {suite.assigned_qa && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400">
                                   QA: {suite.assigned_qa}
                                 </span>
                               )}
@@ -1750,14 +1749,14 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                                 <button
                                   key={lp.id}
                                   onClick={(e) => { e.stopPropagation(); handleOpenPlanPage(lp); }}
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                                 >
                                   Plan: {lp.planId} ({lp.title})
                                 </button>
                               ))}
                             </div>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                          <span className={`px-2 py-0.5 md:px-2.5 md:py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
                             suite.priority === 'Critical' ? 'bg-red-500/10 text-red-500' :
                             suite.priority === 'High' ? 'bg-orange-500/10 text-orange-500' :
                             suite.priority === 'Medium' ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-500/10 text-slate-400'
@@ -1802,7 +1801,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 })}
               </div>
             ) : (
-              <div className="max-w-md mx-auto my-16 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-10 shadow-md">
+              <div className="max-w-md mx-auto my-12 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-8 shadow-md">
                 <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">
                   {showSuiteTrash ? 'Archived Box is Empty' : 'No Test Suites Found'}
                 </h2>
@@ -1826,16 +1825,16 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
         {activeTab === 'plans' && (
           <div className="space-y-6">
             {displayedPlans.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 {displayedPlans.map((plan) => {
                   const linkedSuiteObjs = activeSuites.filter(s => plan.linkedSuites.includes(String(s.id)));
 
                   return (
-                    <div key={plan.id} className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 p-6 shadow-sm space-y-4 hover:shadow-md transition-all">
+                    <div key={plan.id} className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 p-5 md:p-6 shadow-sm space-y-4 hover:shadow-md transition-all">
                       <div className="flex justify-between items-start">
                         <div>
                           <span className="text-xs font-mono font-black text-[#10065F] dark:text-blue-400">{plan.planId}</span>
-                          <h3 className="text-lg font-extrabold text-slate-800 dark:text-white mt-0.5">{plan.title}</h3>
+                          <h3 className="text-base md:text-lg font-extrabold text-slate-800 dark:text-white mt-0.5">{plan.title}</h3>
                         </div>
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
                           plan.environment === 'Production' ? 'bg-red-500/10 text-red-500' :
@@ -1904,7 +1903,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 })}
               </div>
             ) : (
-              <div className="col-span-full max-w-md mx-auto my-12 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-10 shadow-md space-y-3">
+              <div className="col-span-full max-w-md mx-auto my-12 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-8 shadow-md space-y-3">
                 <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">
                   {showPlanTrash ? 'No Archived Test Plans' : 'No Test Plans Configured'}
                 </h3>
@@ -1929,7 +1928,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
       {/* CREATE TEST SUITE MODAL */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150">
+          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-5 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3 mb-5">
               <div>
                 <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Create QA Test Suite</h3>
@@ -2041,7 +2040,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
       {/* CREATE TEST PLAN MODAL */}
       {isPlanModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4">
+          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-5 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3">
               <div>
                 <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Create Release Test Plan</h3>
@@ -2060,7 +2059,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Target Environment</label>
                   <select
@@ -2125,7 +2124,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
       {/* EDIT TEST PLAN MODAL */}
       {isEditPlanModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4">
+          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-5 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3">
               <div>
                 <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Edit Release Test Plan</h3>
@@ -2143,7 +2142,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Target Environment</label>
                   <select

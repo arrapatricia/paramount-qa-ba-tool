@@ -104,12 +104,12 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
   const displayedProjects = showArchived ? archivedProjects : activeProjects;
 
   return (
-    <div className={`p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
+    <div className={`p-4 md:p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
       
       {/* Directory Header & Actions Toolbar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 max-w-5xl mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-10 w-full max-w-7xl mx-auto">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-800 dark:text-white">
             {showArchived ? 'Archived Projects' : 'Projects'}
           </h1>
           <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-1">
@@ -120,10 +120,10 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
         </div>
         
         {/* Toolbar Buttons */}
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => setShowArchived(!showArchived)}
-            className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center ${
               showArchived 
                 ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500/20' 
                 : 'bg-slate-200/60 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300/60'
@@ -135,7 +135,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
           {!showArchived && (
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider text-white bg-[#10065F] hover:bg-[#180A8C] transition-all shadow-md active:scale-[0.98] cursor-pointer"
+              className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider text-white bg-[#10065F] hover:bg-[#180A8C] transition-all shadow-md active:scale-[0.98] cursor-pointer text-center whitespace-nowrap"
             >
               + New Project
             </button>
@@ -145,18 +145,18 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
 
       {/* Folders Grid */}
       {displayedProjects.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 w-full max-w-7xl mx-auto">
           {displayedProjects.map(project => (
             <div 
               key={project.id} 
-              className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-6 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between"
+              className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-5 md:p-6 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between"
             >
               <div>
-                <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-lg font-black tracking-tight text-slate-800 dark:text-white">
+                <div className="flex justify-between items-start mb-3 gap-2">
+                  <h2 className="text-base md:text-lg font-black tracking-tight text-slate-800 dark:text-white leading-snug">
                     {project.name}
                   </h2>
-                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-500">
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-500 shrink-0">
                     {project.status}
                   </span>
                 </div>
@@ -206,7 +206,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
           ))}
         </div>
       ) : (
-        <div className="max-w-md mx-auto my-16 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-10 shadow-md">
+        <div className="max-w-md mx-auto my-12 md:my-16 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-8 md:p-10 shadow-md">
           <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">
             {showArchived ? 'No Archived Projects' : 'Project Workspace Empty'}
           </h2>
@@ -227,13 +227,13 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
       {/* MODAL: CREATE NEW PROJECT */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3 mb-5">
+          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-5 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3">
               <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Initialize Project Workspace</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">✕</button>
             </div>
             
-            <form onSubmit={handleCreateProject} className="space-y-4 text-xs">
+            <form onSubmit={handleCreateProject} className="space-y-3.5 text-xs">
               <div>
                 <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Project Name</label>
                 <input 
@@ -258,7 +258,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
                   placeholder="Project objectives and goals..."
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Project Requestor</label>
                   <input 

@@ -6,6 +6,10 @@ import Documentation from './pages/documentation';
 import TestSuites from './pages/testsuites';
 import SystemsDirectory from './pages/systems';
 
+// Logo Assets
+import blueLogo from './assets/PLGIC_Icon Only_blue.png';
+import whiteLogo from './assets/PLGIC_Icon Only_white.png';
+
 // Session user object mapping
 interface SessionUser {
   id: number;
@@ -29,10 +33,9 @@ interface SessionUser {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  // 1️⃣ Set Light Mode as default (false)
   const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // Navigation State (Includes 'systems' as the primary homepage)
+  // Navigation State
   const [currentView, setCurrentView] = useState<'login' | 'systems' | 'projects' | 'test-suites' | 'users' | 'documentation'>('login');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
@@ -81,8 +84,6 @@ export default function App() {
     };
 
     setCurrentUser(userPayload);
-
-    // Default Landing View for All Users upon logging in
     setCurrentView('systems');
   };
 
@@ -103,112 +104,125 @@ export default function App() {
   return (
     <main className={`${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-[#f8fafc] text-brand-paramount'} min-h-screen font-sans transition-colors duration-300`}>
       
-      {/* 2️⃣ REMOVE HEADER ON LOGIN PAGE: Top Header only renders when logged in */}
-      {isLoggedIn && (
-        <div className="bg-white dark:bg-neutral-cardDark border-b border-slate-100 dark:border-slate-800/80 px-6 py-4 flex justify-between items-center transition-all shadow-sm">
-          
-          {/* Brand Logo - Clicking Paramount Docs lands on Systems Directory for all users */}
-          <div 
-            className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-all" 
+{/* Top Header Navigation (Mobile-Responsive Layout) */}
+{isLoggedIn && (
+  <div className="bg-white dark:bg-neutral-cardDark border-b border-slate-100 dark:border-slate-800/80 px-4 md:px-6 py-3 md:py-4 flex flex-col lg:flex-row justify-between items-center transition-all shadow-sm gap-3">
+    
+    <div className="flex items-center justify-between w-full lg:w-auto">
+      {/* 🟢 Floating Paramount Dark Blue Brand Logo */}
+      <div 
+        className="flex items-center space-x-2.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group" 
+        onClick={() => setCurrentView('systems')}
+      >
+        <img 
+          src={isDarkMode ? whiteLogo : blueLogo} 
+          alt="PLGIC Logo" 
+          className="w-6 h-6 md:w-7 md:h-7 object-contain drop-shadow-[0_3px_5px_rgba(16,6,95,0.25)] dark:drop-shadow-[0_3px_5px_rgba(0,0,0,0.7)]" 
+        />
+        <span className="text-base md:text-lg font-black tracking-tight text-[#10065F] dark:text-blue-400 drop-shadow-[0_3px_6px_rgba(16,6,95,0.30)] dark:drop-shadow-[0_3px_6px_rgba(0,0,0,0.8)]">
+          Paramount Workspace
+        </span>
+      </div>
+
+      {/* Mobile Theme Switcher Toggle */}
+      <button 
+        onClick={toggleTheme}
+        className="lg:hidden flex items-center px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800"
+      >
+        {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+      </button>
+    </div>
+
+    {/* Navigation Items */}
+    <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2 sm:gap-3 w-full lg:w-auto">
+      {currentUser && (
+        <>
+          {/* Systems Directory Tab */}
+          <button 
             onClick={() => setCurrentView('systems')}
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              currentView === 'systems'
+                ? 'bg-brand-paramount text-white shadow-sm' 
+                : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
+            }`}
           >
-            <span className="text-lg font-bold tracking-tight text-blue-600 dark:text-white">
-              Paramount Docs
-            </span>
-            <span className="text-xs text-slate-400">/ Workspace</span>
-          </div>
+            Systems Directory
+          </button>
 
-          {/* Dynamic Navigation Toolbar */}
-          <div className="flex items-center space-x-4">
-            {currentUser && (
-              <>
-                {/* Systems Directory Tab */}
-                <button 
-                  onClick={() => setCurrentView('systems')}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    currentView === 'systems'
-                      ? 'bg-brand-paramount text-white shadow-sm' 
-                      : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
-                  }`}
-                >
-                  Systems Directory
-                </button>
-
-                {currentUser.permissions.projectRead && (
-                  <button 
-                    onClick={() => setCurrentView('projects')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                      currentView === 'projects' || currentView === 'documentation'
-                        ? 'bg-brand-paramount text-white shadow-sm' 
-                        : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
-                    }`}
-                  >
-                    Projects Gallery
-                  </button>
-                )}
-
-                {/* Test Suites Tab */}
-                {currentUser.permissions.qaSuiteRead && (
-                  <button 
-                    onClick={() => setCurrentView('test-suites')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                      currentView === 'test-suites'
-                        ? 'bg-brand-paramount text-white shadow-sm' 
-                        : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
-                    }`}
-                  >
-                    Test Suites
-                  </button>
-                )}
-                
-                {/* Manage Users Tab: Exclusively for Admin */}
-                {isAdmin && (
-                  <button 
-                    onClick={() => setCurrentView('users')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                      currentView === 'users' 
-                        ? 'bg-brand-paramount text-white shadow-sm' 
-                        : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
-                    }`}
-                  >
-                    Manage Users
-                  </button>
-                )}
-              </>
-            )}
-
-            {/* Theme Switcher */}
+          {currentUser.permissions.projectRead && (
             <button 
-              onClick={toggleTheme}
-              className="flex items-center space-x-1.5 px-3 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
+              onClick={() => setCurrentView('projects')}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === 'projects' || currentView === 'documentation'
+                  ? 'bg-brand-paramount text-white shadow-sm' 
+                  : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
+              }`}
             >
-              <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+              Projects Gallery
             </button>
+          )}
 
-            {/* User Widget */}
-            {currentUser && (
-              <div className="flex items-center pl-4 border-l border-slate-100 dark:border-slate-800 space-x-3">
-                <div className="text-right flex flex-col justify-center">
-                  <span className="text-sm font-extrabold tracking-tight text-brand-paramount dark:text-white">
-                    Hi, {currentUser.firstName}!
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 tracking-wide uppercase mt-0.5">
-                    {formattedDate} • {formattedTime}
-                  </span>
-                </div>
-
-                <button 
-                  onClick={handleLogout}
-                  className="px-3 py-1.5 rounded-lg border border-red-500/20 hover:border-red-500/50 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all duration-200 cursor-pointer"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+          {/* Test Suites Tab */}
+          {currentUser.permissions.qaSuiteRead && (
+            <button 
+              onClick={() => setCurrentView('test-suites')}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === 'test-suites'
+                  ? 'bg-brand-paramount text-white shadow-sm' 
+                  : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
+              }`}
+            >
+              Test Suites
+            </button>
+          )}
+          
+          {/* Manage Users Tab */}
+          {isAdmin && (
+            <button 
+              onClick={() => setCurrentView('users')}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === 'users' 
+                  ? 'bg-brand-paramount text-white shadow-sm' 
+                  : 'text-slate-500 hover:text-brand-paramount dark:hover:text-white'
+              }`}
+            >
+              Manage Users
+            </button>
+          )}
+        </>
       )}
 
+      {/* Desktop Theme Switcher */}
+      <button 
+        onClick={toggleTheme}
+        className="hidden lg:flex items-center space-x-1.5 px-3 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
+      >
+        <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+      </button>
+
+      {/* User Profile & Logout */}
+      {currentUser && (
+        <div className="flex items-center pl-2 sm:pl-4 border-l border-slate-100 dark:border-slate-800 space-x-2 sm:space-x-3">
+          <div className="text-right flex flex-col justify-center">
+            <span className="text-xs sm:text-sm font-extrabold tracking-tight text-brand-paramount dark:text-white">
+              Hi, {currentUser.firstName}!
+            </span>
+            <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 dark:text-slate-500 tracking-wide uppercase mt-0.5 hidden sm:block">
+              {formattedDate} • {formattedTime}
+            </span>
+          </div>
+
+          <button 
+            onClick={handleLogout}
+            className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-red-500/20 hover:border-red-500/50 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-200 cursor-pointer"
+          >
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+)}
       {/* Main Container View Routing */}
       <div className="w-full">
         {!isLoggedIn ? (

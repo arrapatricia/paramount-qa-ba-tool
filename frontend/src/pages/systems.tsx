@@ -81,11 +81,55 @@ const DEFAULT_SYSTEMS: SystemCategory[] = [
       { label: 'LIVE', url: 'https://paramount.com.ph/' },
     ],
   },
+  {
+    id: 'claims',
+    code: 'CLAIMS',
+    name: 'Claims E-Filing System',
+    description: 'Online claims registration, document upload, and status tracker system.',
+    environments: [
+      { label: 'DEV', url: '#' },
+      { label: 'STAGING', url: '#' },
+      { label: 'LIVE', url: '#' },
+    ],
+  },
+  {
+    id: 'agent',
+    code: 'AGENT',
+    name: 'Agent Partner Hub',
+    description: 'Sales agent portal for policy processing, commission tracking, and quotes.',
+    environments: [
+      { label: 'STAGING', url: '#' },
+      { label: 'LIVE', url: '#' },
+    ],
+  },
+  {
+    id: 'pay',
+    code: 'PAY',
+    name: 'Central Payment Gateway',
+    description: 'Unified payment API gateway processing credit card, e-wallet, and OTC payments.',
+    environments: [
+      { label: 'DEV', url: '#' },
+      { label: 'LIVE', url: '#' },
+    ],
+  },
+  {
+    id: 'uw',
+    code: 'UW',
+    name: 'Underwriting Engine',
+    description: 'Automated policy risk calculation and automated underwriting approval system.',
+    environments: [
+      { label: 'DEV', url: '#' },
+      { label: 'STAGING', url: '#' },
+    ],
+  },
 ];
+
+const ITEMS_PER_PAGE = 9;
 
 export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
   const [systems, setSystems] = useState<SystemCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(0);
 
   // Add / Edit Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -108,6 +152,11 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
       localStorage.setItem('paramount_systems_directory', JSON.stringify(DEFAULT_SYSTEMS));
     }
   }, []);
+
+  // Reset carousel page back to 0 whenever search query changes
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [searchQuery]);
 
   const handleOpenAddModal = () => {
     setEditingSystemId(null);
@@ -195,6 +244,25 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
     sys.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Carousel Pagination Calculations
+  const totalPages = Math.ceil(filteredSystems.length / ITEMS_PER_PAGE) || 1;
+
+  const paginatedPages = Array.from({ length: totalPages }, (_, index) =>
+    filteredSystems.slice(index * ITEMS_PER_PAGE, (index + 1) * ITEMS_PER_PAGE)
+  );
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(prev => prev - 1);
+    }
+  };
+
   const getBadgeStyle = (label: string) => {
     switch (label) {
       case 'LIVE':
@@ -211,16 +279,16 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
   };
 
   return (
-    <div className={`p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className={`p-4 md:p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
+      <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header Hero Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-neutral-cardDark p-8 rounded-3xl border border-slate-200/60 dark:border-neutral-800 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-neutral-cardDark p-6 md:p-8 rounded-3xl border border-slate-200/60 dark:border-neutral-800 shadow-sm">
           <div className="space-y-2">
-            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500/10 text-[#10065F] dark:text-blue-400">
               Paramount Digital Ecosystem
             </span>
-            <h1 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-800 dark:text-white">
               Systems & Web Applications Directory
             </h1>
             <p className="text-xs font-medium text-slate-400 max-w-xl leading-relaxed">
@@ -239,87 +307,133 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="flex items-center justify-between gap-4">
+        {/* Search & Carousel Controls Bar */}
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white dark:bg-neutral-cardDark p-4 rounded-2xl border border-slate-200/60 dark:border-neutral-800 shadow-sm">
           <div className="relative flex-1 max-w-md">
             <input
               type="text"
               placeholder="Search systems by name, code, or description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-neutral-cardDark text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 font-medium"
+              className="w-full px-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white outline-none focus:ring-1 focus:ring-[#10065F] font-medium"
             />
           </div>
-          <span className="text-xs font-bold text-slate-400">
-            Showing {filteredSystems.length} Platforms
-          </span>
-        </div>
 
-        {/* Systems Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSystems.map((system) => (
-            <div
-              key={system.id}
-              className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all"
-            >
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-mono text-xs font-black text-blue-600 dark:text-blue-400">
-                    {system.code}
-                  </span>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleOpenEditModal(system)}
-                      className="text-[10px] font-bold text-amber-500 hover:underline uppercase cursor-pointer"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSystem(system.id)}
-                      className="text-[10px] font-bold text-red-500 hover:underline uppercase cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
+          <div className="flex items-center justify-between sm:justify-end space-x-4">
+            <span className="text-xs font-bold text-slate-400">
+              Showing {filteredSystems.length} Platforms (Page {currentPage + 1} of {totalPages})
+            </span>
 
-                <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">
-                  {system.name}
-                </h3>
+            {/* Carousel Navigation Buttons */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handlePrevPage}
+                disabled={currentPage === 0}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer font-black text-xs uppercase"
+              >
+                PREV
+              </button>
 
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  {system.description}
-                </p>
-              </div>
-
-              {/* Environment Buttons List */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                  Available Environments:
-                </span>
-
-                <div className="flex flex-wrap gap-2">
-                  {system.environments.map((env) => (
-                    <a
-                      key={env.label + env.url}
-                      href={env.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${getBadgeStyle(env.label)}`}
-                    >
-                      <span>{env.label}</span>
-                      <span className="text-[10px]">↗</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage >= totalPages - 1}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-[#10065F] text-white hover:bg-[#180A8C] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer font-black text-xs uppercase"
+              >
+                NEXT
+              </button>
             </div>
-          ))}
+          </div>
         </div>
 
-        {filteredSystems.length === 0 && (
-          <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 p-12 text-center text-slate-400 text-xs italic">
-            No web platforms or systems match your search filter.
+        {/* SIDEWARDS CAROUSEL CONTAINER (9 Systems Per Slide in 3x3 Grid) */}
+        <div className="overflow-hidden w-full rounded-2xl">
+          <div
+            className="flex transition-transform duration-500 ease-in-out w-full"
+            style={{ transform: `translateX(-${currentPage * 100}%)` }}
+          >
+            {paginatedPages.map((pageGroup, pageIdx) => (
+              <div key={pageIdx} className="w-full shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {pageGroup.map((system) => (
+                  <div
+                    key={system.id}
+                    className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-mono text-xs font-black text-blue-600 dark:text-blue-400">
+                          {system.code}
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleOpenEditModal(system)}
+                            className="text-[10px] font-bold text-amber-500 hover:underline uppercase cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSystem(system.id)}
+                            className="text-[10px] font-bold text-red-500 hover:underline uppercase cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">
+                        {system.name}
+                      </h3>
+
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-3">
+                        {system.description}
+                      </p>
+                    </div>
+
+                    {/* Environment Buttons List */}
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                        Available Environments:
+                      </span>
+
+                      <div className="flex flex-wrap gap-2">
+                        {system.environments.map((env) => (
+                          <a
+                            key={env.label + env.url}
+                            href={env.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${getBadgeStyle(env.label)}`}
+                          >
+                            <span>{env.label}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {filteredSystems.length === 0 && (
+              <div className="w-full bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 p-12 text-center text-slate-400 text-xs italic">
+                No web platforms or systems match your search filter.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Carousel Pagination Dots */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center space-x-2 pt-2">
+            {Array.from({ length: totalPages }).map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentPage(idx)}
+                className={`h-2.5 rounded-full transition-all cursor-pointer ${
+                  currentPage === idx ? 'w-8 bg-[#10065F] dark:bg-blue-400' : 'w-2.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400'
+                }`}
+                title={`Go to page ${idx + 1}`}
+              />
+            ))}
           </div>
         )}
 
@@ -332,7 +446,7 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">
-                  {editingSystemId ? 'Edit System / Platform' : 'Add New System / Platform'}
+                  {editingSystemId ? 'Edit System Record' : 'Add New System Record'}
                 </h3>
                 <p className="text-[10px] text-slate-400 font-medium">
                   Manage application endpoints and environment specifications.
@@ -342,7 +456,7 @@ export default function SystemsDirectory({ isDarkMode }: SystemsProps) {
                 onClick={() => setIsAddModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm font-bold cursor-pointer"
               >
-                ✕
+                X
               </button>
             </div>
 

@@ -283,14 +283,14 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
   };
 
   return (
-    <div className={`flex flex-col h-[calc(100vh-73px)] ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
+    <div className={`flex flex-col min-h-[calc(100vh-73px)] ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
       
       {/* Utility Bar */}
-      <div className="bg-slate-50 dark:bg-neutral-cardDark/40 border-b border-slate-100 dark:border-slate-800/80 px-6 py-3 flex justify-between items-center">
-        <div className="flex items-center space-x-4">
+      <div className="bg-slate-50 dark:bg-neutral-cardDark/40 border-b border-slate-100 dark:border-slate-800/80 px-4 md:px-6 py-3 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+        <div className="flex items-center space-x-3">
           <button 
             onClick={onBackToProjects}
-            className="text-xs font-bold text-slate-500 hover:text-brand-paramount dark:hover:text-white flex items-center space-x-1.5 transition-all cursor-pointer"
+            className="text-xs font-bold text-slate-500 hover:text-brand-paramount dark:hover:text-white flex items-center space-x-1.5 transition-all cursor-pointer shrink-0"
           >
             <span>← Back to Projects</span>
           </button>
@@ -298,42 +298,42 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
           
           <button 
             onClick={() => setIsNavOpen(!isNavOpen)}
-            className="px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
+            className="px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer whitespace-nowrap"
           >
             {isNavOpen ? 'Collapse Nav' : 'Open Doc Nav'}
           </button>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
           <div className="flex bg-slate-100 dark:bg-neutral-cardDark/80 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
             <button 
               onClick={() => setEditorMode('visual')}
-              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'visual' ? 'bg-[#10065F] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+              className={`px-2.5 sm:px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'visual' ? 'bg-[#10065F] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
             >
               Visual Mode
             </button>
             <button 
               onClick={() => setEditorMode('code')}
-              className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'code' ? 'bg-[#10065F] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+              className={`px-2.5 sm:px-3 py-1 rounded-md text-[10px] font-extrabold transition-all uppercase tracking-wide cursor-pointer ${editorMode === 'code' ? 'bg-[#10065F] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
             >
-              HTML Code Mode
+              HTML Mode
             </button>
           </div>
 
           <button 
             onClick={handleExportDoc}
-            className="px-3 py-1.5 rounded-lg bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-bold transition-all shadow-sm cursor-pointer whitespace-nowrap"
           >
             Save as Docs / PDF
           </button>
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
         
         {/* Left Side Navigation Panel */}
         {isNavOpen && (
-          <div className="w-72 bg-white dark:bg-neutral-cardDark/60 border-r border-slate-100 dark:border-slate-800/80 p-5 flex flex-col justify-between overflow-y-auto transition-all space-y-6">
+          <div className="w-full xl:w-72 bg-white dark:bg-neutral-cardDark/60 border-b xl:border-b-0 xl:border-r border-slate-100 dark:border-slate-800/80 p-4 md:p-5 flex flex-col justify-between overflow-y-auto transition-all space-y-6 shrink-0">
             <div className="space-y-6">
               
               {/* BA Document Pages */}
@@ -341,7 +341,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                 <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
                   BA Document Pages
                 </h3>
-                <div className="space-y-1 mb-3">
+                <div className="space-y-1 mb-3 max-h-48 xl:max-h-none overflow-y-auto pr-1">
                   {pages.map((p) => (
                     <button
                       key={p.id}
@@ -362,9 +362,9 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     value={newPageTitle}
                     onChange={(e) => setNewPageTitle(e.target.value)}
                     placeholder="Add BA Page..."
-                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
+                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none min-w-0"
                   />
-                  <button type="submit" className="px-2.5 py-1.5 bg-[#10065F] hover:bg-[#180A8C] text-white rounded-lg text-xs font-extrabold cursor-pointer">+</button>
+                  <button type="submit" className="px-2.5 py-1.5 bg-[#10065F] hover:bg-[#180A8C] text-white rounded-lg text-xs font-extrabold cursor-pointer shrink-0">+</button>
                 </form>
               </div>
 
@@ -396,9 +396,9 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     value={newTagInput}
                     onChange={(e) => setNewTagInput(e.target.value)}
                     placeholder="Add tag..."
-                    className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none"
+                    className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian text-brand-paramount dark:text-white focus:outline-none min-w-0"
                   />
-                  <button type="submit" className="px-3 py-1.5 bg-[#10065F] hover:bg-[#180A8C] text-white rounded-lg text-xs font-extrabold cursor-pointer">+</button>
+                  <button type="submit" className="px-3 py-1.5 bg-[#10065F] hover:bg-[#180A8C] text-white rounded-lg text-xs font-extrabold cursor-pointer shrink-0">+</button>
                 </form>
               </div>
 
@@ -411,7 +411,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   placeholder="Ask AI to write specs..."
-                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian/50 text-brand-paramount dark:text-white placeholder-slate-400 h-24 resize-none"
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-neutral-obsidian/50 text-brand-paramount dark:text-white placeholder-slate-400 h-20 xl:h-24 resize-none"
                 />
                 <button
                   disabled={isGenerating || !aiPrompt.trim()}
@@ -427,18 +427,18 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
         )}
 
         {/* Center Work Canvas */}
-        <div className="flex-1 flex flex-col bg-slate-100/50 dark:bg-neutral-obsidian/20 overflow-y-auto">
+        <div className="flex-1 flex flex-col bg-slate-100/50 dark:bg-neutral-obsidian/20 overflow-y-auto min-w-0">
           
           {editorMode === 'visual' && (
-            <div className="bg-white dark:bg-neutral-cardDark border-b border-slate-100 dark:border-slate-800 sticky top-0 z-10 px-6 py-2.5 flex items-center space-x-2.5 shadow-sm">
-              <button onClick={() => formatVisual('bold')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-black dark:text-white cursor-pointer">B</button>
-              <button onClick={() => formatVisual('italic')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs italic font-black dark:text-white cursor-pointer">I</button>
-              <button onClick={() => formatVisual('underline')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs underline font-black dark:text-white cursor-pointer">U</button>
-              <span className="text-slate-300">|</span>
+            <div className="bg-white dark:bg-neutral-cardDark border-b border-slate-100 dark:border-slate-800 sticky top-0 z-10 px-4 md:px-6 py-2.5 flex items-center gap-2 overflow-x-auto shadow-sm no-scrollbar">
+              <button onClick={() => formatVisual('bold')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-black dark:text-white cursor-pointer shrink-0">B</button>
+              <button onClick={() => formatVisual('italic')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs italic font-black dark:text-white cursor-pointer shrink-0">I</button>
+              <button onClick={() => formatVisual('underline')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs underline font-black dark:text-white cursor-pointer shrink-0">U</button>
+              <span className="text-slate-300 shrink-0">|</span>
               
               <select 
                 onChange={(e) => formatVisual('fontName', e.target.value)}
-                className="text-[11px] font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-neutral-cardDark text-slate-700 dark:text-slate-200 rounded px-2 py-1 outline-none cursor-pointer"
+                className="text-[11px] font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-neutral-cardDark text-slate-700 dark:text-slate-200 rounded px-2 py-1 outline-none cursor-pointer shrink-0"
               >
                 <option value="Segoe UI">Default Font</option>
                 <option value="Courier New">Typewriter (Monospace)</option>
@@ -446,37 +446,37 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                 <option value="Arial">Modern Sans</option>
               </select>
 
-              <span className="text-slate-300">|</span>
-              <button onClick={() => formatVisual('formatBlock', '<h2>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white cursor-pointer">H2</button>
-              <button onClick={() => formatVisual('formatBlock', '<h3>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white cursor-pointer">H3</button>
-              <span className="text-slate-300">|</span>
-              <button onClick={() => formatVisual('insertUnorderedList')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs dark:text-white cursor-pointer">• List</button>
+              <span className="text-slate-300 shrink-0">|</span>
+              <button onClick={() => formatVisual('formatBlock', '<h2>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white cursor-pointer shrink-0">H2</button>
+              <button onClick={() => formatVisual('formatBlock', '<h3>')} className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-[10px] font-black dark:text-white cursor-pointer shrink-0">H3</button>
+              <span className="text-slate-300 shrink-0">|</span>
+              <button onClick={() => formatVisual('insertUnorderedList')} className="px-2 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs dark:text-white cursor-pointer shrink-0">• List</button>
               
-              <span className="text-slate-300">|</span>
+              <span className="text-slate-300 shrink-0">|</span>
               <button 
                 onClick={insertTable} 
-                className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-bold dark:text-white cursor-pointer"
+                className="px-2.5 py-1 border hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-xs font-bold dark:text-white cursor-pointer shrink-0"
               >
                 Table
               </button>
             </div>
           )}
 
-          <div className="bg-slate-50/50 dark:bg-neutral-cardDark/20 px-5 py-1.5 border-b border-slate-100 dark:border-slate-800/80 flex justify-between items-center text-[10px] text-slate-400">
+          <div className="bg-slate-50/50 dark:bg-neutral-cardDark/20 px-4 md:px-5 py-1.5 border-b border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center text-[10px] text-slate-400 gap-1">
             <span>Viewing: <strong className="text-slate-600 dark:text-slate-300">Continuous Workspace Scroll (Google Docs Style)</strong></span>
-            <span>Highlight text to apply font or styling settings above</span>
+            <span className="hidden sm:inline">Highlight text to apply font or styling settings above</span>
           </div>
 
-          <div className="p-8 max-w-5xl w-full mx-auto space-y-8 flex-1">
+          <div className="p-4 md:p-8 max-w-5xl w-full mx-auto space-y-6 md:space-y-8 flex-1">
             {pages.map((p) => (
               <div 
                 key={p.id} 
                 ref={el => { sectionRefs.current[p.id] = el; }}
-                className="bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-slate-800/60 rounded-xl shadow-md p-10 min-h-[500px] flex flex-col transition-all"
+                className="bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-slate-800/60 rounded-xl shadow-md p-5 sm:p-8 md:p-10 min-h-[400px] md:min-h-[500px] flex flex-col transition-all"
               >
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/40 pb-2 mb-6">
-                  <span className="text-[10px] font-black tracking-widest text-[#10065F] dark:text-blue-400 uppercase">Section: {p.title}</span>
-                  <span className="text-[9px] text-slate-400">Word-count aware</span>
+                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/40 pb-2 mb-4 md:mb-6">
+                  <span className="text-[10px] font-black tracking-widest text-[#10065F] dark:text-blue-400 uppercase truncate">Section: {p.title}</span>
+                  <span className="text-[9px] text-slate-400 shrink-0">Word-count aware</span>
                 </div>
 
                 {editorMode === 'visual' ? (
@@ -485,24 +485,24 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                     dangerouslySetInnerHTML={{ __html: p.content }}
                     onBlur={(e) => handlePageContentChange(p.id, e.currentTarget.innerHTML)}
                     className="flex-1 outline-none text-xs text-brand-paramount dark:text-slate-200 prose dark:prose-invert max-w-none space-y-3 leading-relaxed"
-                    style={{ minHeight: '400px' }}
+                    style={{ minHeight: '300px' }}
                   />
                 ) : (
                   <textarea
                     value={p.content}
                     onChange={(e) => handlePageContentChange(p.id, e.target.value)}
-                    className="flex-1 w-full outline-none font-mono text-xs text-brand-paramount dark:text-emerald-400 bg-slate-50 dark:bg-neutral-obsidian/40 border border-slate-200 dark:border-slate-800 rounded-lg p-5 leading-relaxed"
-                    style={{ minHeight: '400px' }}
+                    className="flex-1 w-full outline-none font-mono text-xs text-brand-paramount dark:text-emerald-400 bg-slate-50 dark:bg-neutral-obsidian/40 border border-slate-200 dark:border-slate-800 rounded-lg p-3 md:p-5 leading-relaxed"
+                    style={{ minHeight: '300px' }}
                   />
                 )}
               </div>
             ))}
 
             {pages.length === 0 && (
-              <div className="bg-white dark:bg-neutral-cardDark border border-dashed border-slate-200 dark:border-slate-700/80 rounded-xl p-16 text-center shadow-sm">
+              <div className="bg-white dark:bg-neutral-cardDark border border-dashed border-slate-200 dark:border-slate-700/80 rounded-xl p-8 md:p-16 text-center shadow-sm">
                 <h3 className="text-sm font-bold text-brand-paramount dark:text-white mt-3">Clean Workspace Initialized</h3>
                 <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                  This project directory is currently empty. Use the sidebar on the left to add your first BA document page.
+                  This project directory is currently empty. Use the sidebar menu to add your first BA document page.
                 </p>
               </div>
             )}
@@ -511,7 +511,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
         </div>
 
         {/* Right Side Specs Panel */}
-        <div className="w-80 bg-slate-50/40 dark:bg-neutral-cardDark/30 overflow-y-auto p-5 flex flex-col space-y-5 font-sans">
+        <div className="w-full xl:w-80 bg-slate-50/40 dark:bg-neutral-cardDark/30 overflow-y-auto p-4 md:p-5 flex flex-col space-y-5 font-sans shrink-0 border-t xl:border-t-0 xl:border-l border-slate-100 dark:border-slate-800/80">
           <div>
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
               Project Specs & Info
@@ -541,7 +541,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
               </div>
 
               {/* Dates */}
-              <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/40 pt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/40 pt-3">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1">Commenced</span>
                   <input 
@@ -649,7 +649,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
               Document Audit Trail
             </h3>
-            <div className="flex-1 bg-white dark:bg-neutral-cardDark/55 border border-slate-100 dark:border-slate-800/50 rounded-xl p-3 overflow-y-auto space-y-2.5 min-h-[120px] shadow-sm">
+            <div className="flex-1 bg-white dark:bg-neutral-cardDark/55 border border-slate-100 dark:border-slate-800/50 rounded-xl p-3 overflow-y-auto space-y-2.5 min-h-[120px] max-h-48 xl:max-h-none shadow-sm">
               {auditLogs.map((log, idx) => (
                 <div key={idx} className="border-b border-slate-100 dark:border-slate-800/30 last:border-0 pb-2 last:pb-0 text-[10px]">
                   <div className="flex justify-between font-bold text-slate-400 mb-0.5">

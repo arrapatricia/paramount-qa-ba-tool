@@ -118,7 +118,7 @@ export default function QaTestSuite({ suiteId, suiteTitle, projectName, onLogAud
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3 text-xs">
           
           <div className="flex flex-col justify-center px-3 py-2 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-mono font-black text-xs select-none">
-            <span className="text-[8px] uppercase tracking-wider text-slate-400 font-sans block">Auto ID</span>
+            <span className="text-[8px] uppercase tracking-wider text-slate-400 font-sans block">Case ID</span>
             {getNextTestCaseId()}
           </div>
 

@@ -15,7 +15,7 @@ from . import models, schemas
 # Initialize tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Paramount Docs - QA BA Collaboration API")
+app = FastAPI(title="Paramount Workspace")
 
 # 1. Broad Cors Middleware
 app.add_middleware(

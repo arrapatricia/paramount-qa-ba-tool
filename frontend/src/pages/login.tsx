@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import blueLogo from '../assets/PLGIC_Icon Only_blue.png';
 import whiteLogo from '../assets/PLGIC_Icon Only_white.png';
+import packageJson from '../../package.json'; // Imports version automatically
 
 interface LoginProps {
   isDarkMode: boolean;
@@ -40,10 +41,15 @@ export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-[#f8fafc] dark:bg-neutral-obsidian transition-colors duration-300">
-      <div className="w-full max-w-[440px] bg-white dark:bg-neutral-cardDark rounded-3xl p-10 shadow-2xl border border-slate-100 dark:border-slate-800/50 flex flex-col items-center">
+    <div className="min-h-screen w-full flex flex-col justify-between items-center p-4 md:p-6 bg-[#f8fafc] dark:bg-neutral-obsidian transition-colors duration-300">
+      
+      {/* Top Spacer for Center Alignment */}
+      <div className="hidden sm:block flex-1" />
+
+      {/* Main Login Card */}
+      <div className="w-full max-w-[440px] bg-white dark:bg-neutral-cardDark rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-100 dark:border-slate-800/50 flex flex-col items-center my-auto">
         
-        <div className="w-28 h-28 mb-6 flex items-center justify-center">
+        <div className="w-24 h-28 sm:w-28 sm:h-28 mb-4 sm:mb-6 flex items-center justify-center">
           <img src={isDarkMode ? whiteLogo : blueLogo} alt="PLGIC Logo" className="w-full h-full object-contain" />
         </div>
 
@@ -56,7 +62,7 @@ export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="w-full space-y-6">
+        <form onSubmit={handleSubmit} className="w-full space-y-5 sm:space-y-6">
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase tracking-widest text-brand-paramount dark:text-slate-300">
               Username / Email
@@ -90,10 +96,25 @@ export default function Login({ isDarkMode, onLoginSuccess }: LoginProps) {
             disabled={isAuthenticating}
             className="w-full mt-2 py-4 rounded-xl font-bold tracking-wider text-white bg-[#10065F] hover:bg-[#180A8C] transition-all disabled:opacity-50 cursor-pointer shadow-md"
           >
-            {isAuthenticating ? 'Verifying Account...' : 'Sign In'}
+            {isAuthenticating ? 'Logging In...' : 'Sign In'}
           </button>
         </form>
       </div>
+
+      {/* 🟢 FOOTER: All Rights Reserved & Auto-Incrementing Build Version */}
+      <footer className="w-full flex-1 flex flex-col justify-end py-4 text-center text-xs text-slate-400 dark:text-slate-500 space-y-1 mt-6">
+        <p className="font-semibold text-slate-600 dark:text-slate-400 text-[11px] sm:text-xs">
+          All Rights Reserved to Paramount Life & General Insurance Corp. © {new Date().getFullYear()}
+        </p>
+        <div className="flex items-center justify-center space-x-2 text-[10px] font-mono font-bold">
+          <span className="px-2 py-0.5 rounded bg-blue-500/10 text-[#10065F] dark:text-blue-400 border border-blue-500/20">
+            Version v{packageJson.version}
+          </span>
+          <span>•</span>
+          <span className="text-slate-400">Paramount Workspace</span>
+        </div>
+      </footer>
+
     </div>
   );
 }
