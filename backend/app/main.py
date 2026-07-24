@@ -9,24 +9,27 @@ from pydantic import BaseModel
 # Safe password context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-from .database import engine, Base, get_db
-from . import models, schemas
+from app.database import engine, Base, get_db
+from app import models, schemas
+from app.routers import qa
 
 # Initialize tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Paramount Workspace")
 
-# 1. Broad Cors Middleware
+# =====================================================================
+# 🌐 CORS MIDDLEWARE & FAILSAFE ERROR HANDLER
+# =====================================================================
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,  # Set to False when using allow_origins=["*"] to prevent browser preflight rejects
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 2. Global Exception Catch-All to guarantee CORS headers on ANY error
 @app.middleware("http")
 async def add_cors_header(request: Request, call_next):
     if request.method == "OPTIONS":
@@ -48,6 +51,17 @@ async def add_cors_header(request: Request, call_next):
         )
         response.headers["Access-Control-Allow-Origin"] = "*"
         return response
+
+
+# =====================================================================
+# 🤖 INCLUDE QA WORKSPACE & TEST AUTOMATION ROUTER
+# =====================================================================
+app.include_router(qa.router)
+
+
+# =====================================================================
+# 🚀 DEFAULT ROLES & ADMIN SEEDER
+# =====================================================================
 
 class LoginRequest(BaseModel):
     email: str
@@ -108,14 +122,13 @@ def setup_default_roles():
 
 
 # =====================================================================
-# 🔐 FAILSAFE AUTHENTICATION ENDPOINT
+# 🔐 AUTHENTICATION ENDPOINT
 # =====================================================================
 
 @app.post("/login")
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     clean_email = credentials.email.strip().lower()
     
-    # 1. Fetch user by email
     user = db.query(models.User).filter(models.User.email.ilike(clean_email)).first()
     
     if not user:
@@ -124,10 +137,8 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
             detail="Invalid username or password."
         )
 
-    # 2. Safe Password Verification (Prevents server crashes)
     is_valid = False
     
-    # Check if plain text matches directly
     if user.hashed_password == credentials.password:
         is_valid = True
     else:
@@ -168,14 +179,6 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
             "qa_suite_delete": role.qa_suite_delete if role else False,
         }
     }
-    # except HTTPException as he:
-    #     raise he
-    # except Exception as e:
-    #     print(f"Login error: {e}")
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail=f"Authentication server error: {str(e)}"
-    #     )
 
 
 # =====================================================================
@@ -336,11 +339,11 @@ def delete_note(note_id: int, db: Session = Depends(get_db)):
 
 
 # =====================================================================
-# 🧪 QA SUITE ENDPOINTS
+# 🧪 LEGACY QA SUITE ENDPOINTS
 # =====================================================================
 
 @app.get("/qa-suites")
-def get_qa_suites(db: Session = Depends(get_db)):
+def get_qa_suites_legacy(db: Session = Depends(get_db)):
     try:
         return db.query(models.QASuite).order_by(models.QASuite.id.desc()).all()
     except Exception as e:
@@ -348,7 +351,7 @@ def get_qa_suites(db: Session = Depends(get_db)):
         return []
 
 @app.post("/qa-suites", status_code=status.HTTP_201_CREATED)
-def create_qa_suite(payload: dict, db: Session = Depends(get_db)):
+def create_qa_suite_legacy(payload: dict, db: Session = Depends(get_db)):
     try:
         new_suite = models.QASuite(
             title=payload.get("title"),
@@ -356,7 +359,8 @@ def create_qa_suite(payload: dict, db: Session = Depends(get_db)):
             priority=payload.get("priority", "Medium"),
             suite_type=payload.get("suite_type", "Adhoc"),
             jira_ticket=payload.get("jira_ticket", ""),
-            project_id=payload.get("project_id")
+            project_id=payload.get("project_id"),
+            assigned_qa=payload.get("assigned_qa", "Unassigned")
         )
         db.add(new_suite)
         db.commit()

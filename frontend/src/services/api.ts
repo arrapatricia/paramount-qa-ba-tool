@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create a configured Axios instance pointing to your FastAPI local port
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://paramount-qa-ba-tool-production.up.railway.app',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://paramount-qa-backend.herokuapp.com',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -111,6 +111,42 @@ export const qaSuiteAPI = {
     assigned_qa?: string;
   }) => {
     const res = await API.post('/qa-suites', data);
+    return res.data;
+  },
+}
+// Add these to services/api.ts
+export interface TestRunData {
+  id?: string;
+  run_id: string;
+  suite_id: number;
+  plan_id?: string;
+  runner_type: 'Manual' | 'Robot Framework';
+  passed_count: number;
+  failed_count: number;
+  total_count: number;
+  status: 'Passed' | 'Failed' | 'In Progress';
+  execution_logs?: string;
+  created_at?: string;
+}
+
+export const testPlanAPI = {
+  getAll: async () => {
+    const res = await API.get('/test-plans');
+    return res.data;
+  },
+  create: async (data: any) => {
+    const res = await API.post('/test-plans', data);
+    return res.data;
+  },
+};
+
+export const testRunAPI = {
+  getAll: async () => {
+    const res = await API.get('/test-runs');
+    return res.data;
+  },
+  create: async (data: TestRunData) => {
+    const res = await API.post('/test-runs', data);
     return res.data;
   },
 };

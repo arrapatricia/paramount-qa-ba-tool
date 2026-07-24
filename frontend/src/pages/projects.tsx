@@ -187,11 +187,14 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
           {displayedProjects.map(project => (
             <div 
               key={project.id} 
-              className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-5 md:p-6 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between"
+              onClick={() => !showArchived && handleOpenFolder(project)}
+              className={`rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-5 md:p-6 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group ${
+                !showArchived ? 'cursor-pointer' : ''
+              }`}
             >
               <div>
                 <div className="flex justify-between items-start mb-3 gap-2">
-                  <h2 className="text-base md:text-lg font-black tracking-tight text-slate-800 dark:text-white leading-snug">
+                  <h2 className="text-base md:text-lg font-black tracking-tight text-slate-800 dark:text-white group-hover:text-[#10065F] dark:group-hover:text-blue-400 transition-colors leading-snug">
                     {project.name}
                   </h2>
                   <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-500 shrink-0">
@@ -215,32 +218,51 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 pt-2">
                 {!showArchived ? (
                   <>
+                    {/* OPEN PROJECT BUTTON */}
                     <button 
-                      onClick={() => handleOpenFolder(project)}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenFolder(project);
+                      }}
                       className="w-full py-2.5 rounded-xl text-center font-black text-xs uppercase tracking-widest text-white bg-[#10065F] hover:bg-[#180A8C] transition-all shadow-sm active:scale-[0.98] cursor-pointer"
                     >
-                      Open Folder
+                      OPEN PROJECT
                     </button>
+
+                    {/* ARCHIVE BUTTON */}
                     <button 
-                      onClick={() => handleArchiveProject(project.id)}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleArchiveProject(project.id);
+                      }}
                       className="w-full text-center font-extrabold text-[10px] uppercase tracking-wider text-red-500 hover:underline cursor-pointer"
                     >
-                      Archive Project
+                      ARCHIVE
                     </button>
                   </>
                 ) : (
                   <div className="flex flex-col space-y-2">
                     <button 
-                      onClick={() => handleRestoreProject(project.id)}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRestoreProject(project.id);
+                      }}
                       className="w-full py-2 rounded-xl text-center font-black text-xs uppercase tracking-widest text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white transition-all shadow-sm cursor-pointer"
                     >
                       Restore Project
                     </button>
                     <button 
-                      onClick={() => handleDeletePermanently(project.id)}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePermanently(project.id);
+                      }}
                       className="w-full text-center font-extrabold text-[10px] uppercase tracking-wider text-red-500 hover:underline cursor-pointer"
                     >
                       Delete Permanently
@@ -276,7 +298,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
           <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-5 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3">
               <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Initialize Project Workspace</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">X</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">✕</button>
             </div>
             
             <form onSubmit={handleCreateProject} className="space-y-3.5 text-xs">
