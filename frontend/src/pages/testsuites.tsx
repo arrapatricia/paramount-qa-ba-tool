@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { qaSuiteAPI } from '../services/api';
 
 interface Attachment {
@@ -25,6 +25,7 @@ interface TestCase {
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
   steps?: TestStep[];
   attachments?: Attachment[];
+  history?: AuditLog[];
 }
 
 interface Project {
@@ -97,7 +98,11 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [selectedTestCase, setSelectedTestCase] = useState<TestCase | null>(null);
   const [, setSuiteAuditLogs] = useState<AuditLog[]>([]);
-  const [detailTab, setDetailTab] = useState<'details' | 'steps' | 'attachments'>('details');
+  const [detailTab, setDetailTab] = useState<'details' | 'steps' | 'attachments' | 'history'>('details');
+
+  // Resizable Right Sidebar Width State
+  const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(340);
+  const isDraggingRight = useRef(false);
 
   // Preview Media Lightbox Modal State
   const [previewMedia, setPreviewMedia] = useState<Attachment | null>(null);
@@ -153,6 +158,28 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
   const userName = currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : 'System User';
 
+  // Resizable Right Sidebar Mouse Listener
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDraggingRight.current) {
+        const newWidth = Math.max(260, Math.min(window.innerWidth - e.clientX - 24, 550));
+        setRightSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      isDraggingRight.current = false;
+      document.body.style.cursor = 'default';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   useEffect(() => {
     const savedProjects = localStorage.getItem('qa_ba_projects');
     if (savedProjects) {
@@ -163,20 +190,9 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     if (savedRuns) {
       try { setTestRuns(JSON.parse(savedRuns)); } catch (e) { setTestRuns([]); }
     } else {
-      const initialRobotRun: TestRun = {
-        id: 'run-001',
-        runId: 'ROBOT-RUN-001',
-        suiteTitle: 'Auth API Verification',
-        runnerType: 'Robot Framework',
-        passedCount: 8,
-        failedCount: 0,
-        totalCount: 8,
-        status: 'Passed',
-        executedAt: new Date().toLocaleString(),
-        archivedAt: null
-      };
-      setTestRuns([initialRobotRun]);
-      localStorage.setItem('qa_test_runs', JSON.stringify([initialRobotRun]));
+      // Clean Production Slate: No mock test runs
+      setTestRuns([]);
+      localStorage.setItem('qa_test_runs', JSON.stringify([]));
     }
 
     loadSuites();
@@ -198,29 +214,25 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
       }
 
       if (!data || data.length === 0) {
-        data = [
-          {
-            id: 101,
-            title: 'Payment Distribution',
-            description: 'Test suite to validate all payment distribution scenarios and allocations.',
-            priority: 'Medium',
-            suite_type: 'Adhoc',
-            assigned_qa: 'Arra',
-            created_at: 'Jul 20, 2026',
-            updated_at: 'Jul 24, 2026 08:58 PM'
-          }
-        ];
-        localStorage.setItem('qa_local_suites', JSON.stringify(data));
+        // Clean Production Slate: No mock test suites
+        data = [];
+        localStorage.removeItem('qa_local_suites');
       }
 
-      const trashedStorage = JSON.parse(localStorage.getItem('qa_suites_trash') || '{}');
+      let trashedStorage = {};
+      try {
+        trashedStorage = JSON.parse(localStorage.getItem('qa_suites_trash') || '{}');
+      } catch (e) {
+        trashedStorage = {};
+      }
+
       const now = new Date().getTime();
       const FIFTEEN_DAYS_MS = 15 * 24 * 60 * 60 * 1000;
 
       const filteredAndTaggedData = data
         .map(suite => ({
           ...suite,
-          deletedAt: trashedStorage[suite.id] || null
+          deletedAt: (trashedStorage as any)[suite.id] || null
         }))
         .filter(suite => {
           if (suite.deletedAt) {
@@ -238,7 +250,19 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     }
   };
 
-  const getSuiteInitials = (title: string) => {
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!dateStr.includes('T')) return dateStr;
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+             d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getSuiteInitials = (title?: string) => {
     if (!title || !title.trim()) return 'TC';
     const words = title.trim().split(/\s+/);
     if (words.length === 1) return title.trim().toUpperCase().slice(0, 4);
@@ -247,9 +271,13 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
   const reindexTestCases = (cases: TestCase[], suiteTitle: string): TestCase[] => {
     const prefix = getSuiteInitials(suiteTitle);
-    return cases.map((tc, idx) => ({
+    return (cases || []).map((tc, idx) => ({
       ...tc,
-      testCaseId: tc.testCaseId || `${prefix}-${String(idx + 1).padStart(3, '0')}`
+      testCaseId: tc.testCaseId || `${prefix}-${String(idx + 1).padStart(3, '0')}`,
+      description: tc.description || '',
+      status: tc.status || 'Pending',
+      priority: tc.priority || 'Medium',
+      expectedResult: tc.expectedResult || ''
     }));
   };
 
@@ -272,15 +300,23 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
   const handleMoveSuiteToTrash = (id: number) => {
     const timestamp = new Date().toISOString();
-    const trashedStorage = JSON.parse(localStorage.getItem('qa_suites_trash') || '{}');
-    trashedStorage[id] = timestamp;
+    let trashedStorage = {};
+    try {
+      trashedStorage = JSON.parse(localStorage.getItem('qa_suites_trash') || '{}');
+    } catch (e) { trashedStorage = {}; }
+
+    (trashedStorage as any)[id] = timestamp;
     localStorage.setItem('qa_suites_trash', JSON.stringify(trashedStorage));
     setSuites(prev => prev.map(s => s.id === id ? { ...s, deletedAt: timestamp } : s));
   };
 
   const handleRestoreSuiteFromTrash = (id: number) => {
-    const trashedStorage = JSON.parse(localStorage.getItem('qa_suites_trash') || '{}');
-    delete trashedStorage[id];
+    let trashedStorage = {};
+    try {
+      trashedStorage = JSON.parse(localStorage.getItem('qa_suites_trash') || '{}');
+    } catch (e) { trashedStorage = {}; }
+
+    delete (trashedStorage as any)[id];
     localStorage.setItem('qa_suites_trash', JSON.stringify(trashedStorage));
     setSuites(prev => prev.map(s => s.id === id ? { ...s, deletedAt: null } : s));
   };
@@ -299,8 +335,8 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
   };
 
   const handleOpenSuitePage = (suite: QASuite) => {
-    const createdDateFormatted = suite.created_at || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const updatedDateFormatted = suite.updated_at || createdDateFormatted;
+    const createdDateFormatted = formatDate(suite.created_at);
+    const updatedDateFormatted = formatDate(suite.updated_at || suite.created_at);
 
     const initializedSuite = {
       ...suite,
@@ -311,18 +347,19 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     setActiveMatrixSuite(initializedSuite);
 
     const savedCases = localStorage.getItem(`qa_suite_cases_${suite.id}`);
-    const defaultCases: TestCase[] = [
-      { id: '1', testCaseId: 'PD-TC-001', description: 'Verify full BBR payment when amount uploaded equals premium due', preconditions: '• Policy exists and is active\n• Premium due amount is available', expectedResult: 'BBR amount equals uploaded amount, outstanding balance is 0, and payment status is Paid.', actualResult: 'Outstanding balance is not 0. Payment status is Partially Paid.', status: 'Failed', priority: 'High', steps: [{ stepNumber: 1, action: 'Navigate to Payment Upload Screen' }, { stepNumber: 2, action: 'Upload full BBR payment payload' }] },
-      { id: '2', testCaseId: 'PD-TC-002', description: 'Verify partial BBR payment allocation', preconditions: '• Active policy with balance', expectedResult: 'Partial payment reflected correctly in ledger.', status: 'Passed', priority: 'High' },
-      { id: '3', testCaseId: 'PD-TC-003', description: 'Verify cash loan payment allocation', preconditions: '• Existing loan account', expectedResult: 'Loan principal reduced.', status: 'Passed', priority: 'Medium' },
-      { id: '4', testCaseId: 'PD-TC-004', description: 'Verify policy loan payment allocation', preconditions: '• Loan active', expectedResult: 'Payment posted cleanly.', status: 'Failed', priority: 'Medium' },
-      { id: '5', testCaseId: 'PD-TC-005', description: 'Verify APL distribution', preconditions: '• APL trigger set', expectedResult: 'APL processed.', status: 'Blocked', priority: 'Low' },
-      { id: '6', testCaseId: 'PD-TC-006', description: 'Verify overpayment handling', preconditions: '• Excess funds uploaded', expectedResult: 'Excess moved to suspense account.', status: 'Pending', priority: 'Medium' },
-      { id: '7', testCaseId: 'PD-TC-007', description: 'Verify underpayment handling', preconditions: '• Deficit payment uploaded', expectedResult: 'Notice generated.', status: 'Pending', priority: 'Medium' },
-      { id: '8', testCaseId: 'PD-TC-008', description: 'Verify mixed payment allocation', preconditions: '• Multiple policies linked', expectedResult: 'Distributed proportional to due dates.', status: 'Pending', priority: 'High' },
-    ];
+    const defaultCases: TestCase[] = []; // Clean Production Slate: Empty test case list
 
-    const casesToUse = savedCases ? JSON.parse(savedCases) : (suite.test_cases?.length ? suite.test_cases : defaultCases);
+    let casesToUse = defaultCases;
+    if (savedCases) {
+      try {
+        casesToUse = JSON.parse(savedCases);
+      } catch (e) {
+        casesToUse = defaultCases;
+      }
+    } else if (suite.test_cases?.length) {
+      casesToUse = suite.test_cases;
+    }
+
     const cleanCases = reindexTestCases(casesToUse, suite.title);
     setTestCases(cleanCases);
     setSelectedTestCase(cleanCases[0] || null);
@@ -353,6 +390,24 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     setCaseSteps(tc.steps ? tc.steps.map(s => s.action) : []);
     setCaseAttachments(tc.attachments || []);
     setIsCaseModalOpen(true);
+  };
+
+  const handleDeleteTestCase = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!activeMatrixSuite) return;
+    if (!window.confirm("Are you sure you want to delete this test case?")) return;
+
+    const tcToDelete = testCases.find(c => c.id === id);
+    const updated = testCases.filter(tc => tc.id !== id);
+    setTestCases(updated);
+
+    if (selectedTestCase?.id === id) {
+      setSelectedTestCase(updated[0] || null);
+    }
+
+    localStorage.setItem(`qa_suite_cases_${activeMatrixSuite.id}`, JSON.stringify(updated));
+    logSuiteAudit(activeMatrixSuite.id, `Deleted test case ${tcToDelete?.testCaseId || ''}`);
+    updateSuiteLastTouched(activeMatrixSuite.id);
   };
 
   const handleAddStepInput = () => setCaseSteps(prev => [...prev, '']);
@@ -408,18 +463,32 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
       .filter(s => s.trim().length > 0)
       .map((action, idx) => ({ stepNumber: idx + 1, action: action.trim() }));
 
+    const formattedTimestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+                               new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
     if (editingCaseId) {
-      const updated = testCases.map(tc => tc.id === editingCaseId ? {
-        ...tc,
-        description: caseDesc.trim(),
-        preconditions: casePreconditions.trim(),
-        expectedResult: caseExpected.trim(),
-        actualResult: caseActual.trim(),
-        priority: casePriority,
-        status: caseStatus,
-        steps: formattedSteps,
-        attachments: caseAttachments
-      } : tc);
+      const updated = testCases.map(tc => {
+        if (tc.id === editingCaseId) {
+          const newAuditLog: AuditLog = {
+            timestamp: formattedTimestamp,
+            user: userName,
+            action: `Edited test case details (${tc.testCaseId})`
+          };
+          return {
+            ...tc,
+            description: caseDesc.trim(),
+            preconditions: casePreconditions.trim(),
+            expectedResult: caseExpected.trim(),
+            actualResult: caseActual.trim(),
+            priority: casePriority,
+            status: caseStatus,
+            steps: formattedSteps,
+            attachments: caseAttachments,
+            history: [newAuditLog, ...(tc.history || [])]
+          };
+        }
+        return tc;
+      });
 
       setTestCases(updated);
       setSelectedTestCase(updated.find(c => c.id === editingCaseId) || null);
@@ -428,6 +497,12 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     } else {
       const prefix = getSuiteInitials(activeMatrixSuite.title);
       const autoId = `${prefix}-${String(testCases.length + 1).padStart(3, '0')}`;
+
+      const initialLog: AuditLog = {
+        timestamp: formattedTimestamp,
+        user: userName,
+        action: `Created test case ${autoId}`
+      };
 
       const newCase: TestCase = {
         id: `tc-${Date.now()}`,
@@ -439,7 +514,8 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
         status: caseStatus,
         priority: casePriority,
         steps: formattedSteps,
-        attachments: caseAttachments
+        attachments: caseAttachments,
+        history: [initialLog]
       };
 
       const updated = [...testCases, newCase];
@@ -455,10 +531,30 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
   const handleStatusChange = (id: string, status: 'Passed' | 'Failed' | 'Pending' | 'On Hold' | 'Blocked') => {
     if (!activeMatrixSuite) return;
-    const updated = testCases.map(tc => tc.id === id ? { ...tc, status } : tc);
+
+    const formattedTimestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+                               new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    const updated = testCases.map(tc => {
+      if (tc.id === id) {
+        const newLog: AuditLog = {
+          timestamp: formattedTimestamp,
+          user: userName,
+          action: `Status changed to ${status}`
+        };
+        return {
+          ...tc,
+          status,
+          history: [newLog, ...(tc.history || [])]
+        };
+      }
+      return tc;
+    });
+
     setTestCases(updated);
     if (selectedTestCase?.id === id) {
-      setSelectedTestCase({ ...selectedTestCase, status });
+      const updatedSel = updated.find(c => c.id === id);
+      if (updatedSel) setSelectedTestCase(updatedSel);
     }
     localStorage.setItem(`qa_suite_cases_${activeMatrixSuite.id}`, JSON.stringify(updated));
     logSuiteAudit(activeMatrixSuite.id, `Updated status to ${status}`);
@@ -495,14 +591,6 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
       updated_at: formattedNow
     };
 
-    try {
-      if (qaSuiteAPI && (qaSuiteAPI as any).update) {
-        await (qaSuiteAPI as any).update(activeMatrixSuite.id, payload);
-      }
-    } catch (apiErr) {
-      console.warn("Backend update API fallback:", apiErr);
-    }
-
     const updatedSuite: QASuite = { ...activeMatrixSuite, ...payload };
     setActiveMatrixSuite(updatedSuite);
     setSuites(prev => prev.map(s => s.id === updatedSuite.id ? updatedSuite : s));
@@ -537,7 +625,11 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
         console.warn("Saving suite locally:", err);
       }
 
-      const existingLocal = JSON.parse(localStorage.getItem('qa_local_suites') || '[]');
+      let existingLocal = [];
+      try {
+        existingLocal = JSON.parse(localStorage.getItem('qa_local_suites') || '[]');
+      } catch (e) { existingLocal = []; }
+
       localStorage.setItem('qa_local_suites', JSON.stringify([newSuiteObj, ...existingLocal]));
 
       alert("QA Test Suite created successfully!");
@@ -617,36 +709,112 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     setIsRunModalOpen(true);
   };
 
+  // FORMAL TEST REPORT PDF GENERATOR
   const handleExportReportPDF = () => {
     if (!activeMatrixSuite) return;
     const printWindow = window.open('', '_blank', 'width=900,height=800');
     if (!printWindow) return;
 
     const currentDateFormatted = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const assignedProjName = getProjectName(activeMatrixSuite.project_id) || 'Workspace';
+
+    const testSummaryRows = testCases.map(tc => `
+      <tr style="border-bottom: 1px solid #cbd5e1;">
+        <td style="border-right: 1px solid #cbd5e1; padding: 8px; font-family: monospace; font-weight: bold; color: #10065F;">${tc.testCaseId || ''}</td>
+        <td style="padding: 8px; font-weight: 500;">${tc.description || ''}</td>
+        <td style="border-left: 1px solid #cbd5e1; padding: 8px; font-weight: bold; text-align: center;">
+          <span style="padding: 2px 8px; border-radius: 4px; font-size: 10px; text-transform: uppercase; ${
+            tc.status === 'Passed' ? 'background: #dcfce7; color: #166534;' :
+            tc.status === 'Failed' ? 'background: #fee2e2; color: #991b1b;' :
+            tc.status === 'Blocked' ? 'background: #f1f5f9; color: #334155;' : 'background: #dbeafe; color: #1e40af;'
+          }">${tc.status || 'Pending'}</span>
+        </td>
+      </tr>
+    `).join('');
+
+    const testExecutionBlocks = testCases.map(tc => `
+      <div style="border: 1px solid #0f172a; margin-bottom: 16px; font-size: 12px; page-break-inside: avoid;">
+        <div style="display: grid; grid-template-columns: 1fr 3fr; border-bottom: 1px solid #0f172a; background: #f8fafc;">
+          <div style="padding: 8px; font-weight: bold; border-right: 1px solid #0f172a; background: #f1f5f9;">Test Scenario</div>
+          <div style="padding: 8px;">
+            <div><strong>Given:</strong> ${tc.preconditions || 'System is operational.'}</div>
+            <div><strong>When:</strong> ${tc.description || ''}</div>
+            <div><strong>Then:</strong> ${tc.expectedResult || ''}</div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 3fr; border-bottom: 1px solid #0f172a;">
+          <div style="padding: 8px; font-weight: bold; border-right: 1px solid #0f172a; background: #f1f5f9;">Test Case ID</div>
+          <div style="padding: 8px; font-family: monospace; font-weight: bold; color: #10065F;">${tc.testCaseId || ''}</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 3fr;">
+          <div style="padding: 8px; font-weight: bold; border-right: 1px solid #0f172a; background: #f1f5f9;">Test Result</div>
+          <div style="padding: 8px; font-weight: bold;">${(tc.status || 'PENDING').toUpperCase()}</div>
+        </div>
+      </div>
+    `).join('');
 
     printWindow.document.write(`
       <html>
         <head>
-          <title>${activeMatrixSuite.title} - QA Test Report</title>
+          <title>${activeMatrixSuite.title} - Formal Test Report</title>
           <style>
-            body { font-family: 'Segoe UI', sans-serif; color: #0f172a; padding: 20px; }
-            h1 { font-size: 20px; text-decoration: underline; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-            th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
-            th { background: #f1f5f9; }
+            @page { size: A4 portrait; margin: 15mm; }
+            body { font-family: 'Segoe UI', sans-serif; color: #0f172a; margin: 0; padding: 20px; background: #f8fafc; }
+            .report-card { background: white; padding: 40px; border-radius: 12px; border: 1px solid #cbd5e1; max-width: 800px; margin: 0 auto; }
+            .cover-page { text-align: center; min-height: 800px; display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; }
+            .cover-header { border-bottom: 3px solid #10065F; padding-bottom: 20px; text-align: left; }
+            .cover-title { font-size: 32px; font-weight: 900; color: #10065F; text-transform: uppercase; margin: 40px 0 10px 0; }
+            .cover-meta { background: #f1f5f9; padding: 20px; border-radius: 8px; text-align: left; font-size: 13px; line-height: 1.8; margin-top: 30px; border-left: 4px solid #10065F; }
+            @media print {
+              body { background: white; padding: 0; }
+              .report-card { border: none; padding: 0; }
+            }
           </style>
         </head>
         <body>
-          <h1>QA TEST REPORT: ${activeMatrixSuite.title}</h1>
-          <p>Date: ${currentDateFormatted}</p>
-          <table>
-            <thead>
-              <tr><th>TC ID</th><th>Description</th><th>Priority</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              ${testCases.map(tc => `<tr><td>${tc.testCaseId}</td><td>${tc.description}</td><td>${tc.priority}</td><td>${tc.status}</td></tr>`).join('')}
-            </tbody>
-          </table>
+          <div class="report-card">
+            <!-- PAGE 1: COVER PAGE -->
+            <div class="cover-page">
+              <div class="cover-header">
+                <span style="font-size: 11px; font-weight: 900; color: #64748b; letter-spacing: 2px;">PARAMOUNT WORKSPACE QA REPORT</span>
+              </div>
+              <div>
+                <h1 class="cover-title">${activeMatrixSuite.title}</h1>
+                <p style="font-size: 14px; font-weight: 600; color: #475569;">${activeMatrixSuite.description || 'System Integration & Quality Assurance Execution Report'}</p>
+                <div class="cover-meta">
+                  <div><strong>Project Workspace:</strong> ${assignedProjName}</div>
+                  <div><strong>Assigned QA Owner:</strong> ${activeMatrixSuite.assigned_qa || 'Unassigned'}</div>
+                  <div><strong>Priority Level:</strong> ${activeMatrixSuite.priority || 'Medium'}</div>
+                  <div><strong>Total Executed Cases:</strong> ${executedCount} / ${totalCount} (${passRate}% Pass Rate)</div>
+                  <div><strong>Report Generation Date:</strong> ${currentDateFormatted}</div>
+                </div>
+              </div>
+              <div style="border-top: 1px solid #cbd5e1; pt-4; font-size: 11px; color: #64748b;">
+                Confidential - Paramount Life & General Insurance QA Systems
+              </div>
+            </div>
+
+            <!-- PAGE 2: TEST SUMMARY -->
+            <div style="margin-bottom: 30px; page-break-after: always;">
+              <h2 style="font-size: 16px; font-weight: 900; text-transform: uppercase; color: #10065F; border-bottom: 2px solid #cbd5e1; pb-2; margin-bottom: 15px;">Executive Test Summary</h2>
+              <table style="width: 100%; border-collapse: collapse; border: 1px solid #0f172a; font-size: 12px;">
+                <thead>
+                  <tr style="background: #f1f5f9; border-bottom: 1px solid #0f172a; text-align: left;">
+                    <th style="border-right: 1px solid #0f172a; padding: 8px; width: 25%;">Test Case ID</th>
+                    <th style="padding: 8px;">Description</th>
+                    <th style="border-left: 1px solid #0f172a; padding: 8px; text-align: center; width: 20%;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>${testSummaryRows}</tbody>
+              </table>
+            </div>
+
+            <!-- PAGE 3+: DETAILED TEST EXECUTIONS -->
+            <div>
+              <h2 style="font-size: 16px; font-weight: 900; text-transform: uppercase; color: #10065F; border-bottom: 2px solid #cbd5e1; pb-2; margin-bottom: 15px;">Detailed Scenario Breakdown</h2>
+              ${testExecutionBlocks}
+            </div>
+          </div>
         </body>
       </html>
     `);
@@ -660,7 +828,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
     return found ? found.name : null;
   };
 
-  // Metrics
+  // Metrics Calculation
   const totalCount = testCases.length;
   const passedCount = testCases.filter(c => c.status === 'Passed').length;
   const failedCount = testCases.filter(c => c.status === 'Failed').length;
@@ -669,10 +837,13 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
   const executedCount = totalCount - pendingCount;
   const passRate = totalCount > 0 ? ((passedCount / totalCount) * 100).toFixed(1) : '0.0';
 
-  // Filters & Pagination
-  const filteredCases = testCases.filter(tc => {
-    const matchesSearch = tc.testCaseId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          tc.description.toLowerCase().includes(searchQuery.toLowerCase());
+  // Defensive filtering across test cases
+  const filteredCases = (testCases || []).filter(tc => {
+    const tcId = (tc.testCaseId || '').toLowerCase();
+    const tcDesc = (tc.description || '').toLowerCase();
+    const query = (searchQuery || '').toLowerCase();
+
+    const matchesSearch = tcId.includes(query) || tcDesc.includes(query);
     const matchesStatus = statusFilter === 'All' || tc.status === statusFilter;
     const matchesPriority = priorityFilter === 'All' || tc.priority === priorityFilter;
     return matchesSearch && matchesStatus && matchesPriority;
@@ -680,6 +851,9 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
   const totalPages = Math.ceil(filteredCases.length / ITEMS_PER_PAGE) || 1;
   const paginatedCases = filteredCases.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Dynamic computation of ALL attachments across suite for the right panel
+  const allSuiteAttachments = (testCases || []).flatMap(tc => tc.attachments || []);
 
   const activeSuites = suites.filter(s => !s.deletedAt);
   const trashedSuites = suites.filter(s => !!s.deletedAt);
@@ -699,600 +873,690 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
   const getPriorityBadgeClass = (priority: string) => {
     switch (priority) {
       case 'Low':
-        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
+        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30';
       case 'Medium':
-        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30';
       case 'High':
-        return 'bg-rose-500/10 text-rose-600 dark:text-rose-400';
+        return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30';
       case 'Critical':
-        return 'bg-red-700/20 text-red-700 dark:text-red-400';
+        return 'bg-red-700/20 text-red-700 dark:text-red-400 border border-red-700/30';
       default:
-        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30';
+    }
+  };
+
+  // Status color badge helper
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'Passed':
+        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30';
+      case 'Failed':
+        return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30';
+      case 'Blocked':
+        return 'bg-slate-600/10 text-slate-700 dark:text-slate-300 border border-slate-600/30';
+      case 'Pending':
+        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30';
+      case 'On Hold':
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30';
+      default:
+        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30';
+    }
+  };
+
+  const getStatusSolidClass = (status: string) => {
+    switch (status) {
+      case 'Passed': return 'bg-emerald-500 text-white';
+      case 'Failed': return 'bg-rose-500 text-white';
+      case 'Blocked': return 'bg-slate-700 text-white';
+      case 'Pending': return 'bg-blue-600 text-white';
+      case 'On Hold': return 'bg-amber-500 text-white';
+      default: return 'bg-blue-600 text-white';
     }
   };
 
   // =====================================================================
-  // 1️⃣ DEDICATED FULL SUITE WORKSPACE VIEW
+  // 1️⃣ DEDICATED FULL SUITE WORKSPACE VIEW (LIQUID GLASS)
   // =====================================================================
   if (activeMatrixSuite) {
     const assignedProjectName = getProjectName(activeMatrixSuite.project_id);
 
     return (
-      <div className={`p-4 md:p-6 min-h-[calc(100vh-56px)] font-sans ${isDarkMode ? 'dark bg-[#0B0F19] text-white' : 'bg-[#F8FAFC] text-slate-900'}`}>
-        
-        {/* TOP HEADER & ALIGNED TOOLBAR */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center space-x-2 text-xs font-semibold text-slate-400 mb-1">
-              <button onClick={() => setActiveMatrixSuite(null)} className="hover:underline text-blue-600 dark:text-blue-400 font-bold">Projects</button>
-              <span>/</span>
-              <span>{assignedProjectName || 'PD-iPeak Integration'}</span>
-              <span>/</span>
-              <span>Test Suites</span>
-              <span>/</span>
-              <span className="text-slate-700 dark:text-slate-200 font-bold">{activeMatrixSuite.title}</span>
+      <div className={`p-4 md:p-6 min-h-[calc(100vh-56px)] font-sans relative overflow-hidden transition-colors duration-500 ${
+        isDarkMode ? 'dark bg-[#080C14] text-white' : 'bg-[#EBF1F6] text-slate-900'
+      }`}>
+        {/* AMBIENT BACKGROUND GLOW */}
+        <div className="absolute top-[-5%] left-[-5%] w-[500px] h-[500px] bg-gradient-to-br from-blue-500/15 to-purple-600/15 rounded-full blur-[130px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-gradient-to-tl from-indigo-500/15 to-sky-400/15 rounded-full blur-[140px] pointer-events-none" />
+
+        <div className="relative z-10 space-y-6">
+
+          {/* SUBTLE BACK BUTTON & BREADCRUMB */}
+          <div className="flex items-center space-x-2 text-xs font-semibold text-slate-400 mb-2">
+            <button 
+              onClick={() => setActiveMatrixSuite(null)} 
+              className="flex items-center space-x-1 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 font-bold transition-all cursor-pointer group"
+            >
+              <span className="group-hover:-translate-x-0.5 transition-transform">&larr;</span>
+              <span>Back to Test Suites</span>
+            </button>
+            <span>/</span>
+            <button onClick={() => setActiveMatrixSuite(null)} className="hover:underline text-blue-600 dark:text-blue-400 font-bold cursor-pointer">Projects</button>
+            <span>/</span>
+            <span>{assignedProjectName || 'Workspace'}</span>
+            <span>/</span>
+            <button onClick={() => setActiveMatrixSuite(null)} className="hover:underline text-blue-600 dark:text-blue-400 font-bold cursor-pointer">Test Suites</button>
+            <span>/</span>
+            <span className="text-slate-700 dark:text-slate-200 font-bold">{activeMatrixSuite.title}</span>
+          </div>
+
+          {/* TOP HEADER & ALIGNED TOOLBAR */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl p-6 rounded-[32px] border border-white/80 dark:border-slate-800/80 shadow-xl shadow-black/5">
+            <div>
+              <div className="flex items-center space-x-3">
+                <h1 className="text-2xl md:text-3xl font-black text-[#10065F] dark:text-white tracking-tight">
+                  {activeMatrixSuite.title}
+                </h1>
+                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 backdrop-blur-md">
+                  {activeMatrixSuite.suite_type || 'Test Suite'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1">
+                {activeMatrixSuite.description || "Test suite to validate scenario allocations and execution rules."}
+              </p>
             </div>
+
+            {/* Top Right Action Buttons Bar */}
+            <div className="flex items-center space-x-2 shrink-0">
+              <button 
+                onClick={handleOpenEditSpecs}
+                className="px-4 py-2.5 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-white/80 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer shadow-xs backdrop-blur-md"
+              >
+                Edit Suite
+              </button>
+              <button 
+                onClick={handleExportReportPDF}
+                className="px-4 py-2.5 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-white/80 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all cursor-pointer shadow-xs backdrop-blur-md"
+              >
+                Export
+              </button>
+              <button 
+                onClick={handleOpenAddCase}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#10065F] to-[#1a0a80] dark:from-blue-600 dark:to-indigo-600 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer"
+              >
+                + Add Test Case
+              </button>
+            </div>
+          </div>
+
+          {/* RESIZABLE FLEX CONTAINER */}
+          <div className="flex flex-col lg:flex-row items-start w-full gap-0 relative">
             
-            <div className="flex items-center space-x-3">
-              <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                {activeMatrixSuite.title}
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                {activeMatrixSuite.suite_type || 'Test Suite'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 font-medium mt-1">
-              {activeMatrixSuite.description || "Test suite to validate scenario allocations and execution rules."}
-            </p>
-          </div>
-
-          {/* Top Right Action Buttons Bar */}
-          <div className="flex items-center space-x-2 shrink-0">
-            <button 
-              onClick={handleOpenEditSpecs}
-              className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition-all cursor-pointer shadow-xs"
-            >
-              Edit Suite
-            </button>
-            <button 
-              onClick={handleExportReportPDF}
-              className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition-all cursor-pointer shadow-xs"
-            >
-              Export
-            </button>
-            <button 
-              onClick={handleOpenAddCase}
-              className="px-4 py-2 rounded-xl bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-black uppercase tracking-wider transition-all shadow-md cursor-pointer"
-            >
-              + Add Test Case
-            </button>
-          </div>
-        </div>
-
-        {/* 2-COLUMN MAIN GRID LAYOUT */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* LEFT / MAIN METRICS & MATRIX TABLE (8 COLUMNS) */}
-          <div className="lg:col-span-8 space-y-6">
-            
-            {/* 1️⃣ TOP 6 METRIC CARDS */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              <div className="bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">TOTAL CASES</span>
-                <div className="text-2xl font-black text-slate-800 dark:text-white mt-2">{totalCount}</div>
-              </div>
-
-              <div className="bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-500">PASSED</span>
-                <div>
-                  <div className="text-2xl font-black text-emerald-500 mt-2">{passedCount}</div>
-                  <span className="text-[9px] font-bold text-slate-400">{totalCount > 0 ? ((passedCount/totalCount)*100).toFixed(1) : 0}%</span>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-                <span className="text-[9px] font-black uppercase tracking-wider text-rose-500">FAILED</span>
-                <div>
-                  <div className="text-2xl font-black text-rose-500 mt-2">{failedCount}</div>
-                  <span className="text-[9px] font-bold text-slate-400">{totalCount > 0 ? ((failedCount/totalCount)*100).toFixed(1) : 0}%</span>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-                <span className="text-[9px] font-black uppercase tracking-wider text-amber-500">BLOCKED</span>
-                <div>
-                  <div className="text-2xl font-black text-amber-500 mt-2">{blockedCount}</div>
-                  <span className="text-[9px] font-bold text-slate-400">{totalCount > 0 ? ((blockedCount/totalCount)*100).toFixed(1) : 0}%</span>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-                <span className="text-[9px] font-black uppercase tracking-wider text-blue-500">PENDING</span>
-                <div>
-                  <div className="text-2xl font-black text-blue-500 mt-2">{pendingCount}</div>
-                  <span className="text-[9px] font-bold text-slate-400">{totalCount > 0 ? ((pendingCount/totalCount)*100).toFixed(1) : 0}%</span>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-[#111827] p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-                <span className="text-[9px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">PASS RATE</span>
-                <div>
-                  <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-2">{passRate}%</div>
-                  <span className="text-[9px] font-bold text-emerald-500">+12.5% vs last run</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 2️⃣ EXECUTION PROGRESS BAR */}
-            <div className="bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-2">
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden flex">
-                <div className="bg-emerald-500 h-full" style={{ width: `${totalCount > 0 ? (passedCount/totalCount)*100 : 0}%` }}></div>
-                <div className="bg-rose-500 h-full" style={{ width: `${totalCount > 0 ? (failedCount/totalCount)*100 : 0}%` }}></div>
-                <div className="bg-amber-500 h-full" style={{ width: `${totalCount > 0 ? (blockedCount/totalCount)*100 : 0}%` }}></div>
-                <div className="bg-blue-500 h-full" style={{ width: `${totalCount > 0 ? (pendingCount/totalCount)*100 : 0}%` }}></div>
-              </div>
-
-              <div className="flex justify-between items-center text-xs font-semibold text-slate-400 pt-1">
-                <span><strong>{executedCount}</strong> of <strong>{totalCount}</strong> test cases executed</span>
-                <span>Last updated: {activeMatrixSuite.updated_at || 'Jul 24, 2026 08:58 PM'}</span>
-              </div>
-            </div>
-
-            {/* 3️⃣ FILTER TOOLBAR */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#111827] p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
-              <div className="flex flex-wrap items-center gap-2 flex-1">
-                <div className="relative flex-1 min-w-[180px]">
-                  <input
-                    type="text"
-                    placeholder="Search test cases..."
-                    value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                    className="w-full pl-3 pr-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none"
-                  />
+            {/* LEFT / MAIN METRICS & MATRIX TABLE */}
+            <div className="flex-1 min-w-0 space-y-6 pr-0 lg:pr-2 w-full">
+              
+              {/* 1️⃣ TOP 6 METRIC CARDS */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 rounded-2xl border border-white/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">TOTAL CASES</span>
+                  <div className="text-2xl font-black text-[#10065F] dark:text-white mt-2">{totalCount}</div>
                 </div>
 
-                <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }} className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer">
-                  <option value="All">Status: All</option>
-                  <option value="Passed">Passed</option>
-                  <option value="Failed">Failed</option>
-                  <option value="Blocked">Blocked</option>
-                  <option value="Pending">Pending</option>
-                </select>
-
-                <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }} className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer">
-                  <option value="All">Priority: All</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                  <option value="Critical">Critical</option>
-                </select>
-              </div>
-            </div>
-
-            {/* 4️⃣ STREAMLINED MATRIX DATA TABLE (MAX 7 ITEMS PER PAGE) */}
-            <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-x-auto shadow-xs">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 text-[10px] uppercase font-black text-slate-400">
-                    <th className="p-3 w-8 text-center"><input type="checkbox" className="rounded" /></th>
-                    <th className="p-3">TC ID</th>
-                    <th className="p-3">Description</th>
-                    <th className="p-3">Priority</th>
-                    <th className="p-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {paginatedCases.map((tc) => (
-                    <tr 
-                      key={tc.id}
-                      onClick={() => setSelectedTestCase(tc)}
-                      onDoubleClick={() => handleOpenEditCase(tc)}
-                      className={`hover:bg-blue-50/50 dark:hover:bg-slate-900/40 cursor-pointer transition-colors ${
-                        selectedTestCase?.id === tc.id ? 'bg-blue-50/80 dark:bg-slate-800/60' : ''
-                      }`}
-                    >
-                      <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="rounded" /></td>
-                      <td className="p-3 font-mono font-black text-[#10065F] dark:text-blue-400 whitespace-nowrap">{tc.testCaseId}</td>
-                      <td className="p-3 font-medium text-slate-800 dark:text-white">{tc.description}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getPriorityBadgeClass(tc.priority)}`}>
-                          {tc.priority || 'Medium'}
-                        </span>
-                      </td>
-                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                        <select
-                          value={tc.status}
-                          onChange={(e: any) => handleStatusChange(tc.id, e.target.value)}
-                          className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer border-0 ${
-                            tc.status === 'Passed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-                            tc.status === 'Failed' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' :
-                            tc.status === 'Blocked' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                          }`}
-                        >
-                          <option value="Passed">Passed</option>
-                          <option value="Failed">Failed</option>
-                          <option value="Blocked">Blocked</option>
-                          <option value="Pending">Pending</option>
-                          <option value="On Hold">On Hold</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                  {paginatedCases.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="p-6 text-center text-slate-400 italic">No test cases found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-
-              {/* PAGINATION FOOTER */}
-              {filteredCases.length > 0 && (
-                <div className="p-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 flex justify-between items-center text-xs text-slate-400 font-semibold">
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 rounded-2xl border border-white/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">PASSED</span>
                   <div>
-                    Showing <strong>{((currentPage - 1) * ITEMS_PER_PAGE) + 1}</strong> to <strong>{Math.min(currentPage * ITEMS_PER_PAGE, filteredCases.length)}</strong> of <strong>{filteredCases.length}</strong> test cases
-                  </div>
-
-                  <div className="flex items-center space-x-1">
-                    <button
-                      disabled={currentPage === 1}
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                    >
-                      &lt;
-                    </button>
-                    
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                      <button
-                        key={p}
-                        onClick={() => setCurrentPage(p)}
-                        className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                          currentPage === p
-                            ? 'bg-[#10065F] text-white border-[#10065F]'
-                            : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-
-                    <button
-                      disabled={currentPage === totalPages}
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                    >
-                      &gt;
-                    </button>
+                    <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2">{passedCount}</div>
+                    <span className="text-[9px] font-bold text-slate-400">{totalCount > 0 ? ((passedCount/totalCount)*100).toFixed(1) : 0}%</span>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* 5️⃣ BOTTOM TEST CASE DETAILS INSPECTOR */}
-            {selectedTestCase && (
-              <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <div className="flex space-x-6 text-xs font-bold text-slate-400">
-                    <button onClick={() => setDetailTab('details')} className={`pb-2 transition-all cursor-pointer ${detailTab === 'details' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' : 'hover:text-slate-600'}`}>Test Case Details</button>
-                    <button onClick={() => setDetailTab('steps')} className={`pb-2 transition-all cursor-pointer ${detailTab === 'steps' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' : 'hover:text-slate-600'}`}>Test Steps ({selectedTestCase.steps?.length || 0})</button>
-                    <button onClick={() => setDetailTab('attachments')} className={`pb-2 transition-all cursor-pointer ${detailTab === 'attachments' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' : 'hover:text-slate-600'}`}>Attachments ({selectedTestCase.attachments?.length || 0})</button>
-                  </div>
-                  
-                  {/* Subtle Edit Button */}
-                  <button 
-                    onClick={() => handleOpenEditCase(selectedTestCase)} 
-                    className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-extrabold rounded-xl transition-all cursor-pointer shadow-xs"
-                  >
-                    Edit Case Details
-                  </button>
-                </div>
-
-                {detailTab === 'details' && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-                    <div className="space-y-3">
-                      <div><span className="text-[10px] font-bold uppercase text-slate-400 block">TC ID</span><span className="font-mono font-black text-[#10065F] dark:text-blue-400 text-sm">{selectedTestCase.testCaseId}</span></div>
-                      <div><span className="text-[10px] font-bold uppercase text-slate-400 block">Description</span><p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedTestCase.description}</p></div>
-                      <div><span className="text-[10px] font-bold uppercase text-slate-400 block">Preconditions</span><pre className="font-sans text-slate-500 dark:text-slate-400 whitespace-pre-line mt-0.5">{selectedTestCase.preconditions || 'None.'}</pre></div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div><span className="text-[10px] font-bold uppercase text-slate-400 block">Priority</span><span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-block mt-0.5 ${getPriorityBadgeClass(selectedTestCase.priority)}`}>{selectedTestCase.priority || 'Medium'}</span></div>
-                      <div><span className="text-[10px] font-bold uppercase text-slate-400 block">Status</span><span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-600 text-white uppercase inline-block mt-0.5">{selectedTestCase.status}</span></div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div><span className="text-[10px] font-bold uppercase text-slate-400 block">Expected Result</span><p className="font-medium text-slate-700 dark:text-slate-300 mt-0.5">{selectedTestCase.expectedResult}</p></div>
-                      {selectedTestCase.actualResult && (<div><span className="text-[10px] font-bold uppercase text-slate-400 block">Actual Result</span><p className="font-semibold text-rose-600 dark:text-rose-400 mt-0.5">{selectedTestCase.actualResult}</p></div>)}
-                    </div>
-                  </div>
-                )}
-
-                {detailTab === 'steps' && (
-                  <div className="space-y-2 text-xs">
-                    {selectedTestCase.steps && selectedTestCase.steps.length > 0 ? (
-                      selectedTestCase.steps.map((st) => (
-                        <div key={st.stepNumber} className="p-2.5 bg-slate-50 dark:bg-slate-900 rounded-xl flex items-center space-x-3">
-                          <span className="px-2 py-0.5 bg-blue-500/10 text-blue-600 font-bold font-mono text-[10px] rounded-lg">Step {st.stepNumber}</span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">{st.action}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-slate-400 italic py-2">No steps added. Click "Edit Case Details" to add steps.</p>
-                    )}
-                  </div>
-                )}
-
-                {/* ATTACHMENTS WITH PREVIEW CLICK */}
-                {detailTab === 'attachments' && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    {selectedTestCase.attachments && selectedTestCase.attachments.length > 0 ? (
-                      selectedTestCase.attachments.map(att => (
-                        <div 
-                          key={att.id} 
-                          onClick={() => setPreviewMedia(att)}
-                          className="p-2.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900 hover:border-blue-500 transition-all cursor-pointer space-y-1 group"
-                        >
-                          <span className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate block">{att.name}</span>
-                          <span className="text-[10px] text-slate-400 block">{att.size || 'Attachment'} - Click to view</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-slate-400 italic py-2 col-span-full">No evidence files attached to this test case.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-          </div>
-
-          {/* RIGHT SUITE INFO PANEL */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="p-5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
-              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">SUITE INFORMATION</span>
-                <button onClick={handleOpenEditSpecs} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">•••</button>
-              </div>
-
-              <div>
-                <h2 className="text-xl font-black text-slate-800 dark:text-white leading-tight">{activeMatrixSuite.title}</h2>
-                <div className="flex items-center space-x-2 mt-1.5">
-                  <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase text-white ${failedCount > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`}>
-                    {failedCount > 0 ? 'FAILED' : 'PASSED'}
-                  </span>
-                  <span className="text-xs font-bold text-slate-500">{passRate}% pass rate</span>
-                </div>
-              </div>
-
-              <div className="space-y-3 text-xs pt-2 border-t border-slate-100 dark:border-slate-800/60">
-                <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Project</span><span className="font-bold text-indigo-600 dark:text-indigo-400">{assignedProjectName || 'PD-iPeak Integration'}</span></div>
-                <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Assigned QA</span><span className="font-bold text-slate-700 dark:text-slate-300">{activeMatrixSuite.assigned_qa || 'Unassigned'}</span></div>
-                <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Created</span><span className="font-bold text-slate-700 dark:text-slate-300">{activeMatrixSuite.created_at || 'Jul 20, 2026'}</span></div>
-                <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Last Updated</span><span className="font-bold text-slate-700 dark:text-slate-300">{activeMatrixSuite.updated_at || 'Jul 24, 2026'}</span></div>
-                <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Priority</span><span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${getPriorityBadgeClass(activeMatrixSuite.priority || 'Medium')}`}>{activeMatrixSuite.priority || 'MEDIUM'}</span></div>
-
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-slate-400 font-medium block">Execution Progress</span>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${totalCount > 0 ? (executedCount/totalCount)*100 : 0}%` }}></div>
-                  </div>
-                  <span className="text-[11px] font-bold text-emerald-600 block">{executedCount} / {totalCount} executed ({totalCount > 0 ? ((executedCount/totalCount)*100).toFixed(1) : 0}%)</span>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                <button onClick={handleOpenEditSpecs} className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition-all cursor-pointer">
-                  Edit Suite Specs
-                </button>
-                <button onClick={handleExportReportPDF} className="w-full py-2.5 rounded-xl bg-[#10065F] hover:bg-[#180A8C] text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md">
-                  Download Test Report (PDF)
-                </button>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block border-b border-slate-100 dark:border-slate-800 pb-2">ATTACHMENTS</span>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div 
-                  onClick={() => setPreviewMedia({ id: 'demo-1', name: 'screenshot_01.png', type: 'image', url: 'https://via.placeholder.com/600x400', size: '245 KB' })}
-                  className="p-2 border border-slate-200 dark:border-slate-700 rounded-xl space-y-1 bg-slate-50 dark:bg-slate-900 cursor-pointer hover:border-blue-500 transition-all"
-                >
-                  <span className="font-bold text-slate-700 dark:text-slate-300 block truncate">screenshot_01.png</span>
-                  <span className="text-[9px] text-slate-400 block">245 KB</span>
-                </div>
-                <div 
-                  onClick={() => setPreviewMedia({ id: 'demo-2', name: 'recording.mp4', type: 'video', url: '', size: '12.4 MB' })}
-                  className="p-2 border border-slate-200 dark:border-slate-700 rounded-xl space-y-1 bg-slate-50 dark:bg-slate-900 cursor-pointer hover:border-blue-500 transition-all"
-                >
-                  <span className="font-bold text-slate-700 dark:text-slate-300 block truncate">recording.mp4</span>
-                  <span className="text-[9px] text-slate-400 block">12.4 MB</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* LIGHTBOX MEDIA PREVIEW MODAL */}
-        {previewMedia && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="max-w-3xl w-full bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3 text-white">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <span className="text-xs font-bold uppercase tracking-wider">{previewMedia.name}</span>
-                <button onClick={() => setPreviewMedia(null)} className="text-slate-400 hover:text-white font-bold cursor-pointer">✕</button>
-              </div>
-
-              <div className="max-h-[70vh] flex items-center justify-center rounded-xl overflow-hidden bg-black p-2">
-                {previewMedia.type === 'image' ? (
-                  <img src={previewMedia.url} alt={previewMedia.name} className="max-h-[65vh] object-contain" />
-                ) : previewMedia.type === 'video' && previewMedia.url ? (
-                  <video src={previewMedia.url} controls autoPlay className="max-h-[65vh] w-full" />
-                ) : (
-                  <div className="p-8 text-center text-slate-400 text-xs">
-                    Preview not available for this file type.
-                    <a href={previewMedia.url} download={previewMedia.name} className="block mt-2 font-bold text-blue-400 underline">Download File</a>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL: ADD OR EDIT TEST CASE */}
-        {isCaseModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
-                <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase">{editingCaseId ? 'Edit Test Case Details' : 'Add New Test Case'}</h3>
-                <button onClick={() => setIsCaseModalOpen(false)} className="text-slate-400 font-bold cursor-pointer">✕</button>
-              </div>
-
-              <form onSubmit={handleSaveTestCase} className="space-y-4 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-400 mb-1">Description</label>
-                  <input type="text" required value={caseDesc} onChange={(e) => setCaseDesc(e.target.value)} placeholder="e.g. Verify payment method calculation" className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white font-semibold outline-none" />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-400 mb-1">Preconditions (Optional)</label>
-                  <input type="text" value={casePreconditions} onChange={(e) => setCasePreconditions(e.target.value)} placeholder="e.g. User logged in" className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white outline-none" />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-400 mb-1">Expected Result</label>
-                  <textarea rows={2} value={caseExpected} onChange={(e) => setCaseExpected(e.target.value)} placeholder="e.g. Transaction completed successfully." className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white font-medium outline-none resize-none" />
-                </div>
-
-                {editingCaseId && (
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 rounded-2xl border border-white/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">FAILED</span>
                   <div>
-                    <label className="block font-bold text-slate-400 mb-1">Actual Result (Optional)</label>
-                    <textarea rows={2} value={caseActual} onChange={(e) => setCaseActual(e.target.value)} placeholder="e.g. Output mismatch on ledger." className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white font-medium outline-none resize-none" />
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-400 mb-1">Priority</label>
-                    <select value={casePriority} onChange={(e: any) => setCasePriority(e.target.value)} className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 font-bold cursor-pointer outline-none">
-                      <option value="Low">Low (Green)</option>
-                      <option value="Medium">Medium (Orange)</option>
-                      <option value="High">High (Red)</option>
-                      <option value="Critical">Critical (Dark Red)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-400 mb-1">Status</label>
-                    <select value={caseStatus} onChange={(e: any) => setCaseStatus(e.target.value)} className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 font-bold cursor-pointer outline-none">
-                      <option value="Pending">Pending</option>
-                      <option value="Passed">Passed</option>
-                      <option value="Failed">Failed</option>
-                      <option value="Blocked">Blocked</option>
-                      <option value="On Hold">On Hold</option>
-                    </select>
+                    <div className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-2">{failedCount}</div>
+                    <span className="text-[9px] font-bold text-slate-400">{totalCount > 0 ? ((failedCount/totalCount)*100).toFixed(1) : 0}%</span>
                   </div>
                 </div>
 
-                {/* DYNAMIC STEPS BUILDER */}
-                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex justify-between items-center">
-                    <label className="block font-bold text-slate-400 uppercase tracking-wide text-[10px]">Test Steps (Optional)</label>
-                    <button type="button" onClick={handleAddStepInput} className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">+ Add Step</button>
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 rounded-2xl border border-white/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">BLOCKED</span>
+                  <div>
+                    <div className="text-2xl font-black text-slate-600 dark:text-slate-400 mt-2">{blockedCount}</div>
+                    <span className="text-[9px] font-bold text-slate-400">{totalCount > 0 ? ((blockedCount/totalCount)*100).toFixed(1) : 0}%</span>
                   </div>
-
-                  {caseSteps.map((stepText, idx) => (
-                    <div key={idx} className="flex items-center space-x-2">
-                      <span className="font-mono text-xs font-bold text-slate-400 w-14 shrink-0">Step {idx + 1}</span>
-                      <input type="text" value={stepText} onChange={(e) => handleStepChange(idx, e.target.value)} placeholder={`Describe Step ${idx + 1}...`} className="flex-1 p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white outline-none" />
-                      <button type="button" onClick={() => handleRemoveStep(idx)} className="text-red-500 font-bold text-xs px-2 cursor-pointer">✕</button>
-                    </div>
-                  ))}
                 </div>
 
-                {/* OPTIONAL FILE ATTACHMENT INPUT */}
-                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <label className="block font-bold text-slate-400 uppercase tracking-wide text-[10px]">Attach Files / Evidence (Optional)</label>
-                  <div 
-                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={(e) => { e.preventDefault(); setIsDragging(false); processUploadedFiles(e.dataTransfer.files); }}
-                    className={`border-2 border-dashed rounded-xl p-3 text-center transition-all cursor-pointer ${
-                      isDragging ? 'border-blue-600 bg-blue-500/10' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50'
-                    }`}
-                  >
-                    <input 
-                      type="file" multiple id="modal-file-upload" className="hidden" 
-                      onChange={(e) => processUploadedFiles(e.target.files)} 
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 rounded-2xl border border-white/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-blue-500">PENDING</span>
+                  <div>
+                    <div className="text-2xl font-black text-blue-500 mt-2">{pendingCount}</div>
+                    <span className="text-[9px] font-bold text-slate-400">{totalCount > 0 ? ((pendingCount/totalCount)*100).toFixed(1) : 0}%</span>
+                  </div>
+                </div>
+
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 rounded-2xl border border-white/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">PASS RATE</span>
+                  <div>
+                    <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-2">{passRate}%</div>
+                    <span className="text-[9px] font-bold text-emerald-500">Pass Percentage</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2️⃣ EXECUTION PROGRESS BAR */}
+              <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-white/80 dark:border-slate-800/80 shadow-xs space-y-2">
+                <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden flex">
+                  <div className="bg-emerald-500 h-full" style={{ width: `${totalCount > 0 ? (passedCount/totalCount)*100 : 0}%` }}></div>
+                  <div className="bg-rose-500 h-full" style={{ width: `${totalCount > 0 ? (failedCount/totalCount)*100 : 0}%` }}></div>
+                  <div className="bg-slate-600 h-full" style={{ width: `${totalCount > 0 ? (blockedCount/totalCount)*100 : 0}%` }}></div>
+                  <div className="bg-blue-500 h-full" style={{ width: `${totalCount > 0 ? (pendingCount/totalCount)*100 : 0}%` }}></div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs font-semibold text-slate-500 dark:text-slate-400 pt-1">
+                  <span><strong>{executedCount}</strong> of <strong>{totalCount}</strong> test cases executed</span>
+                  <span>Last updated: {formatDate(activeMatrixSuite.updated_at)}</span>
+                </div>
+              </div>
+
+              {/* 3️⃣ FILTER TOOLBAR */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 rounded-2xl border border-white/80 dark:border-slate-800/80 shadow-xs">
+                <div className="flex flex-wrap items-center gap-2 flex-1">
+                  <div className="relative flex-1 min-w-[180px]">
+                    <input
+                      type="text"
+                      placeholder="Search test cases..."
+                      value={searchQuery}
+                      onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                      className="w-full px-3.5 py-2 bg-white/50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl text-xs font-medium outline-none text-slate-800 dark:text-white shadow-inner"
                     />
-                    <label htmlFor="modal-file-upload" className="cursor-pointer block space-y-1">
-                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 block">Click to upload or drag & drop files here</span>
-                      <span className="text-[10px] text-slate-400 block">Images, videos, or documents</span>
-                    </label>
                   </div>
 
-                  {caseAttachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {caseAttachments.map(att => (
-                        <div key={att.id} className="flex items-center space-x-2 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-xs">
-                          <span className="font-semibold truncate max-w-[150px]">{att.name}</span>
-                          <button type="button" onClick={() => handleRemoveAttachment(att.id)} className="text-red-500 hover:text-red-700 font-bold cursor-pointer">✕</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }} className="px-3 py-2 bg-white/50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer backdrop-blur-md">
+                    <option value="All" className="dark:bg-slate-900">Status: All</option>
+                    <option value="Passed" className="dark:bg-slate-900">Passed</option>
+                    <option value="Failed" className="dark:bg-slate-900">Failed</option>
+                    <option value="Blocked" className="dark:bg-slate-900">Blocked</option>
+                    <option value="Pending" className="dark:bg-slate-900">Pending</option>
+                  </select>
 
-                <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <button type="button" onClick={() => setIsCaseModalOpen(false)} className="px-4 py-2 border rounded-xl font-bold text-slate-500 cursor-pointer">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-[#10065F] hover:bg-[#180A8C] text-white font-bold rounded-xl shadow-md uppercase cursor-pointer">
-                    {editingCaseId ? 'Update Test Case' : 'Save Test Case'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* EDIT SUITE SPECS MODAL */}
-        {isEditSuiteModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-2xl space-y-4">
-              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
-                <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase">Edit Test Suite Specifications</h3>
-                <button onClick={() => setIsEditSuiteModalOpen(false)} className="text-slate-400 font-bold cursor-pointer">✕</button>
-              </div>
-
-              <form onSubmit={handleSaveEditedSpecs} noValidate className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-400 mb-1">Suite Title</label>
-                  <input type="text" required value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white font-semibold outline-none" />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-400 mb-1">Assigned QA</label>
-                  <input type="text" value={editAssignedQa} onChange={(e) => setEditAssignedQa(e.target.value)} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white font-semibold outline-none" />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-400 mb-1">Priority</label>
-                  <select value={editPriority} onChange={(e) => setEditPriority(e.target.value)} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white font-semibold outline-none cursor-pointer">
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Critical">Critical</option>
+                  <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }} className="px-3 py-2 bg-white/50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer backdrop-blur-md">
+                    <option value="All" className="dark:bg-slate-900">Priority: All</option>
+                    <option value="High" className="dark:bg-slate-900">High</option>
+                    <option value="Medium" className="dark:bg-slate-900">Medium</option>
+                    <option value="Low" className="dark:bg-slate-900">Low</option>
+                    <option value="Critical" className="dark:bg-slate-900">Critical</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-400 mb-1">Description / Notes</label>
-                  <textarea rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white font-semibold outline-none resize-none" />
-                </div>
-                <div className="flex justify-end space-x-2 pt-2">
-                  <button type="button" onClick={() => setIsEditSuiteModalOpen(false)} className="px-4 py-2 border rounded-xl font-bold cursor-pointer">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-[#10065F] text-white font-bold rounded-xl cursor-pointer">Save Specs</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+              </div>
 
+              {/* 4️⃣ STREAMLINED MATRIX DATA TABLE */}
+              <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[28px] border border-white/80 dark:border-slate-800/80 overflow-x-auto shadow-xl shadow-black/5">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-white/60 dark:border-slate-800/80 bg-white/40 dark:bg-slate-950/40 text-[10px] uppercase font-black text-slate-400">
+                      <th className="p-3.5 w-8 text-center"><input type="checkbox" className="rounded" /></th>
+                      <th className="p-3.5">TC ID</th>
+                      <th className="p-3.5">Description</th>
+                      <th className="p-3.5">Priority</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/40 dark:divide-slate-800/60">
+                    {paginatedCases.map((tc) => (
+                      <tr 
+                        key={tc.id}
+                        onClick={() => setSelectedTestCase(tc)}
+                        onDoubleClick={() => handleOpenEditCase(tc)}
+                        className={`hover:bg-white/50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors ${
+                          selectedTestCase?.id === tc.id ? 'bg-white/80 dark:bg-slate-800/80' : ''
+                        }`}
+                      >
+                        <td className="p-3.5 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="rounded" /></td>
+                        <td className="p-3.5 font-mono font-black text-[#10065F] dark:text-blue-400 whitespace-nowrap">{tc.testCaseId || ''}</td>
+                        <td className="p-3.5 font-medium text-slate-800 dark:text-white">{tc.description || ''}</td>
+                        <td className="p-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-md ${getPriorityBadgeClass(tc.priority)}`}>
+                            {tc.priority || 'Medium'}
+                          </span>
+                        </td>
+                        <td className="p-3.5" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={tc.status || 'Pending'}
+                            onChange={(e: any) => handleStatusChange(tc.id, e.target.value)}
+                            className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer backdrop-blur-md ${getStatusBadgeClass(tc.status || 'Pending')}`}
+                          >
+                            <option value="Passed" className="bg-white dark:bg-slate-900 text-emerald-600 font-bold">Passed</option>
+                            <option value="Failed" className="bg-white dark:bg-slate-900 text-rose-600 font-bold">Failed</option>
+                            <option value="Blocked" className="bg-white dark:bg-slate-900 text-slate-700 font-bold">Blocked</option>
+                            <option value="Pending" className="bg-white dark:bg-slate-900 text-blue-600 font-bold">Pending</option>
+                            <option value="On Hold" className="bg-white dark:bg-slate-900 text-amber-600 font-bold">On Hold</option>
+                          </select>
+                        </td>
+                        <td className="p-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => handleDeleteTestCase(tc.id, e)}
+                            className="text-rose-500 hover:text-rose-700 font-black uppercase text-[10px] hover:underline cursor-pointer"
+                            title="Delete this test case"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {paginatedCases.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-slate-400 italic">No test cases recorded yet. Click "+ Add Test Case" to get started.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {/* PAGINATION FOOTER */}
+                {filteredCases.length > 0 && (
+                  <div className="p-3.5 border-t border-white/60 dark:border-slate-800/80 bg-white/40 dark:bg-slate-950/40 flex justify-between items-center text-xs text-slate-400 font-semibold">
+                    <div>
+                      Showing <strong>{((currentPage - 1) * ITEMS_PER_PAGE) + 1}</strong> to <strong>{Math.min(currentPage * ITEMS_PER_PAGE, filteredCases.length)}</strong> of <strong>{filteredCases.length}</strong> test cases
+                    </div>
+
+                    <div className="flex items-center space-x-1">
+                      <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        className="px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer"
+                      >
+                        &lt;
+                      </button>
+                      
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setCurrentPage(p)}
+                          className={`px-3 py-1 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                            currentPage === p
+                              ? 'bg-[#10065F] dark:bg-blue-600 text-white border-transparent'
+                              : 'border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+
+                      <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        className="px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer"
+                      >
+                        &gt;
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 5️⃣ BOTTOM TEST CASE DETAILS INSPECTOR */}
+              {selectedTestCase && (
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[28px] border border-white/80 dark:border-slate-800/80 p-6 shadow-xl shadow-black/5 space-y-4">
+                  <div className="flex justify-between items-center border-b border-white/60 dark:border-slate-800 pb-3">
+                    <div className="flex space-x-6 text-xs font-bold text-slate-400">
+                      <button onClick={() => setDetailTab('details')} className={`pb-2 transition-all cursor-pointer ${detailTab === 'details' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-black' : 'hover:text-slate-600'}`}>Test Case Details</button>
+                      <button onClick={() => setDetailTab('steps')} className={`pb-2 transition-all cursor-pointer ${detailTab === 'steps' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-black' : 'hover:text-slate-600'}`}>Test Steps ({selectedTestCase.steps?.length || 0})</button>
+                      <button onClick={() => setDetailTab('attachments')} className={`pb-2 transition-all cursor-pointer ${detailTab === 'attachments' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-black' : 'hover:text-slate-600'}`}>Attachments ({selectedTestCase.attachments?.length || 0})</button>
+                      <button onClick={() => setDetailTab('history')} className={`pb-2 transition-all cursor-pointer ${detailTab === 'history' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-black' : 'hover:text-slate-600'}`}>History ({selectedTestCase.history?.length || 0})</button>
+                    </div>
+                    
+                    <button 
+                      onClick={() => handleOpenEditCase(selectedTestCase)} 
+                      className="px-3.5 py-1.5 bg-white/60 dark:bg-slate-800/60 border border-white/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white font-extrabold rounded-xl transition-all cursor-pointer shadow-xs backdrop-blur-md"
+                    >
+                      Edit Case Details
+                    </button>
+                  </div>
+
+                  {detailTab === 'details' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                      <div className="space-y-3">
+                        <div><span className="text-[10px] font-bold uppercase text-slate-400 block">TC ID</span><span className="font-mono font-black text-[#10065F] dark:text-blue-400 text-sm">{selectedTestCase.testCaseId}</span></div>
+                        <div><span className="text-[10px] font-bold uppercase text-slate-400 block">Description</span><p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedTestCase.description}</p></div>
+                        <div><span className="text-[10px] font-bold uppercase text-slate-400 block">Preconditions</span><pre className="font-sans text-slate-500 dark:text-slate-400 whitespace-pre-line mt-0.5">{selectedTestCase.preconditions || 'None.'}</pre></div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div><span className="text-[10px] font-bold uppercase text-slate-400 block">Priority</span><span className={`px-2.5 py-1 rounded-full text-[10px] font-black inline-block mt-0.5 ${getPriorityBadgeClass(selectedTestCase.priority)}`}>{selectedTestCase.priority || 'Medium'}</span></div>
+                        <div>
+                          <span className="text-[10px] font-bold uppercase text-slate-400 block">Status</span>
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase inline-block mt-0.5 ${getStatusSolidClass(selectedTestCase.status)}`}>
+                            {selectedTestCase.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div><span className="text-[10px] font-bold uppercase text-slate-400 block">Expected Result</span><p className="font-medium text-slate-700 dark:text-slate-300 mt-0.5">{selectedTestCase.expectedResult}</p></div>
+                        {selectedTestCase.actualResult && (<div><span className="text-[10px] font-bold uppercase text-slate-400 block">Actual Result</span><p className="font-semibold text-rose-600 dark:text-rose-400 mt-0.5">{selectedTestCase.actualResult}</p></div>)}
+                      </div>
+                    </div>
+                  )}
+
+                  {detailTab === 'steps' && (
+                    <div className="space-y-2 text-xs">
+                      {selectedTestCase.steps && selectedTestCase.steps.length > 0 ? (
+                        selectedTestCase.steps.map((st) => (
+                          <div key={st.stepNumber} className="p-3 bg-white/50 dark:bg-slate-950/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50 flex items-center space-x-3 backdrop-blur-md">
+                            <span className="px-2.5 py-0.5 bg-blue-500/10 text-blue-600 font-bold font-mono text-[10px] rounded-lg border border-blue-500/20">Step {st.stepNumber}</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">{st.action}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-slate-400 italic py-2">No steps added. Click "Edit Case Details" to add steps.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {detailTab === 'attachments' && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      {selectedTestCase.attachments && selectedTestCase.attachments.length > 0 ? (
+                        selectedTestCase.attachments.map(att => (
+                          <div 
+                            key={att.id} 
+                            onClick={() => setPreviewMedia(att)}
+                            className="p-3 border border-white/80 dark:border-slate-800/80 rounded-2xl bg-white/50 dark:bg-slate-950/40 backdrop-blur-md hover:border-blue-500 transition-all cursor-pointer space-y-1 group"
+                          >
+                            <span className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate block">{att.name}</span>
+                            <span className="text-[10px] text-slate-400 block">{att.size || 'Attachment'} - Click to view</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-slate-400 italic py-2 col-span-full">No evidence files attached to this test case.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {detailTab === 'history' && (
+                    <div className="space-y-2.5 text-xs max-h-48 overflow-y-auto">
+                      {selectedTestCase.history && selectedTestCase.history.length > 0 ? (
+                        selectedTestCase.history.map((log, idx) => (
+                          <div key={idx} className="p-3 bg-white/50 dark:bg-slate-950/40 backdrop-blur-md rounded-xl border border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center text-xs">
+                            <div>
+                              <span className="font-bold text-slate-800 dark:text-slate-200 block">{log.action}</span>
+                              <span className="text-[10px] text-slate-400 font-medium">By {log.user}</span>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-400">{log.timestamp}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-slate-400 italic py-2">No history logs recorded for this test case yet.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+
+            {/* DRAG HANDLE BAR FOR SCALABLE SIDEBAR */}
+            <div
+              onMouseDown={() => { isDraggingRight.current = true; document.body.style.cursor = 'col-resize'; }}
+              className="hidden lg:flex w-3 hover:w-3 cursor-col-resize self-stretch items-center justify-center group z-10 mx-1 shrink-0"
+              title="Drag to resize sidebar"
+            >
+              <div className="w-1 h-12 bg-slate-300/80 dark:bg-slate-700/80 rounded-full group-hover:bg-blue-600 transition-all"></div>
+            </div>
+
+            {/* RIGHT SUITE INFO PANEL */}
+            <div 
+              style={{ width: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${rightSidebarWidth}px` : '100%' }}
+              className="w-full lg:w-auto space-y-6 shrink-0"
+            >
+              <div className="p-6 rounded-[28px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/80 dark:border-slate-800/80 shadow-xl shadow-black/5 space-y-4">
+                <div className="flex justify-between items-center border-b border-white/60 dark:border-slate-800 pb-3">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">SUITE INFORMATION</span>
+                  <button onClick={handleOpenEditSpecs} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">•••</button>
+                </div>
+
+                <div>
+                  <h2 className="text-xl font-black text-[#10065F] dark:text-white leading-tight">{activeMatrixSuite.title}</h2>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <span className={`px-3 py-0.5 rounded-full text-[10px] font-black uppercase text-white ${failedCount > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                      {failedCount > 0 ? 'FAILED' : 'PASSED'}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500">{passRate}% pass rate</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-xs pt-2 border-t border-white/60 dark:border-slate-800/80">
+                  <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Project</span><span className="font-bold text-indigo-600 dark:text-indigo-400">{assignedProjectName || 'Workspace'}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Assigned QA</span><span className="font-bold text-slate-700 dark:text-slate-300">{activeMatrixSuite.assigned_qa || 'Unassigned'}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Created</span><span className="font-bold text-slate-700 dark:text-slate-300">{formatDate(activeMatrixSuite.created_at)}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Last Updated</span><span className="font-bold text-slate-700 dark:text-slate-300">{formatDate(activeMatrixSuite.updated_at || activeMatrixSuite.created_at)}</span></div>
+                  <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Priority</span><span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${getPriorityBadgeClass(activeMatrixSuite.priority || 'Medium')}`}>{activeMatrixSuite.priority || 'MEDIUM'}</span></div>
+
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-slate-400 font-medium block">Execution Progress</span>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${totalCount > 0 ? (executedCount/totalCount)*100 : 0}%` }}></div>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-600 block">{executedCount} / {totalCount} executed ({totalCount > 0 ? ((executedCount/totalCount)*100).toFixed(1) : 0}%)</span>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-white/60 dark:border-slate-800 space-y-2">
+                  <button onClick={handleOpenEditSpecs} className="w-full py-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-white/80 transition-all cursor-pointer backdrop-blur-md">
+                    Edit Suite Specs
+                  </button>
+                  <button onClick={handleExportReportPDF} className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-[#10065F] to-[#1a0a80] dark:from-blue-600 dark:to-indigo-600 hover:shadow-lg hover:shadow-blue-500/20 text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md">
+                    Download Test Report (PDF)
+                  </button>
+                </div>
+              </div>
+
+              {/* DYNAMIC SUITE ATTACHMENTS GALLERY */}
+              <div className="p-6 rounded-[28px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/80 dark:border-slate-800/80 shadow-xl shadow-black/5 space-y-3">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block border-b border-white/60 dark:border-slate-800 pb-2">
+                  ATTACHMENTS ({allSuiteAttachments.length})
+                </span>
+                
+                {allSuiteAttachments.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 text-xs max-h-60 overflow-y-auto pr-1">
+                    {allSuiteAttachments.map((att) => (
+                      <div 
+                        key={att.id}
+                        onClick={() => setPreviewMedia(att)}
+                        className="p-2.5 border border-white/80 dark:border-slate-800 rounded-xl space-y-1 bg-white/50 dark:bg-slate-950/40 backdrop-blur-md cursor-pointer hover:border-blue-500 transition-all"
+                      >
+                        <span className="font-bold text-slate-700 dark:text-slate-300 block truncate" title={att.name}>{att.name}</span>
+                        <span className="text-[9px] text-slate-400 block">{att.size || 'Attachment'}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic py-2">No attachments uploaded across this suite yet.</p>
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* LIGHTBOX MEDIA PREVIEW MODAL */}
+          {previewMedia && (
+            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className="max-w-3xl w-full bg-slate-900/90 rounded-[32px] p-6 border border-slate-700/80 shadow-2xl space-y-4 text-white backdrop-blur-2xl">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider">{previewMedia.name}</span>
+                  <button onClick={() => setPreviewMedia(null)} className="text-slate-400 hover:text-white font-bold cursor-pointer">✕</button>
+                </div>
+
+                <div className="max-h-[70vh] flex items-center justify-center rounded-2xl overflow-hidden bg-black/60 p-2 border border-slate-800">
+                  {previewMedia.type === 'image' ? (
+                    <img src={previewMedia.url} alt={previewMedia.name} className="max-h-[65vh] object-contain" />
+                  ) : previewMedia.type === 'video' && previewMedia.url ? (
+                    <video src={previewMedia.url} controls autoPlay className="max-h-[65vh] w-full" />
+                  ) : (
+                    <div className="p-8 text-center text-slate-400 text-xs">
+                      Preview not available for this file type.
+                      <a href={previewMedia.url} download={previewMedia.name} className="block mt-2 font-bold text-blue-400 underline">Download File</a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: ADD OR EDIT TEST CASE */}
+          {isCaseModalOpen && (
+            <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className="w-full max-w-xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl rounded-[32px] p-6 sm:p-8 border border-white/80 dark:border-slate-700/80 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-3">
+                  <h3 className="text-sm font-black text-[#10065F] dark:text-white uppercase tracking-wider">{editingCaseId ? 'Edit Test Case Details' : 'Add New Test Case'}</h3>
+                  <button onClick={() => setIsCaseModalOpen(false)} className="text-slate-400 font-bold cursor-pointer">✕</button>
+                </div>
+
+                <form onSubmit={handleSaveTestCase} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Description</label>
+                    <input type="text" required value={caseDesc} onChange={(e) => setCaseDesc(e.target.value)} placeholder="e.g. Verify payment method calculation" className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" />
+                  </div>
+
+                  <div>
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Preconditions (Optional)</label>
+                    <input type="text" value={casePreconditions} onChange={(e) => setCasePreconditions(e.target.value)} placeholder="e.g. User logged in" className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" />
+                  </div>
+
+                  <div>
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Expected Result</label>
+                    <textarea rows={2} value={caseExpected} onChange={(e) => setCaseExpected(e.target.value)} placeholder="e.g. Transaction completed successfully." className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-blue-500 resize-none shadow-inner" />
+                  </div>
+
+                  {editingCaseId && (
+                    <div>
+                      <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Actual Result (Optional)</label>
+                      <textarea rows={2} value={caseActual} onChange={(e) => setCaseActual(e.target.value)} placeholder="e.g. Output mismatch on ledger." className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-blue-500 resize-none shadow-inner" />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Priority</label>
+                      <select value={casePriority} onChange={(e: any) => setCasePriority(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-bold outline-none cursor-pointer">
+                        <option value="Low" className="dark:bg-slate-900">Low</option>
+                        <option value="Medium" className="dark:bg-slate-900">Medium</option>
+                        <option value="High" className="dark:bg-slate-900">High</option>
+                        <option value="Critical" className="dark:bg-slate-900">Critical</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Status</label>
+                      <select value={caseStatus} onChange={(e: any) => setCaseStatus(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-bold outline-none cursor-pointer">
+                        <option value="Pending" className="dark:bg-slate-900">Pending</option>
+                        <option value="Passed" className="dark:bg-slate-900">Passed</option>
+                        <option value="Failed" className="dark:bg-slate-900">Failed</option>
+                        <option value="Blocked" className="dark:bg-slate-900">Blocked</option>
+                        <option value="On Hold" className="dark:bg-slate-900">On Hold</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* DYNAMIC STEPS BUILDER */}
+                  <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                    <div className="flex justify-between items-center">
+                      <label className="block font-black text-slate-400 uppercase tracking-wide text-[10px]">Test Steps (Optional)</label>
+                      <button type="button" onClick={handleAddStepInput} className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">+ Add Step</button>
+                    </div>
+
+                    {caseSteps.map((stepText, idx) => (
+                      <div key={idx} className="flex items-center space-x-2">
+                        <span className="font-mono text-xs font-bold text-slate-400 w-14 shrink-0">Step {idx + 1}</span>
+                        <input type="text" value={stepText} onChange={(e) => handleStepChange(idx, e.target.value)} placeholder={`Describe Step ${idx + 1}...`} className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white outline-none" />
+                        <button type="button" onClick={() => handleRemoveStep(idx)} className="text-rose-500 font-bold text-xs px-2 cursor-pointer">✕</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* OPTIONAL FILE ATTACHMENT INPUT */}
+                  <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                    <label className="block font-black text-slate-400 uppercase tracking-wide text-[10px]">Attach Files / Evidence (Optional)</label>
+                    <div 
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={(e) => { e.preventDefault(); setIsDragging(false); processUploadedFiles(e.dataTransfer.files); }}
+                      className={`border-2 border-dashed rounded-2xl p-4 text-center transition-all cursor-pointer ${
+                        isDragging ? 'border-blue-600 bg-blue-500/10' : 'border-slate-300 dark:border-slate-700 bg-white/40 dark:bg-slate-950/30'
+                      }`}
+                    >
+                      <input 
+                        type="file" multiple id="modal-file-upload" className="hidden" 
+                        onChange={(e) => processUploadedFiles(e.target.files)} 
+                      />
+                      <label htmlFor="modal-file-upload" className="cursor-pointer block space-y-1">
+                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400 block">Click to upload or drag & drop files here</span>
+                        <span className="text-[10px] text-slate-400 block">Images, videos, or documents</span>
+                      </label>
+                    </div>
+
+                    {caseAttachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {caseAttachments.map(att => (
+                          <div key={att.id} className="flex items-center space-x-2 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-xs">
+                            <span className="font-semibold truncate max-w-[150px]">{att.name}</span>
+                            <button type="button" onClick={() => handleRemoveAttachment(att.id)} className="text-rose-500 hover:text-rose-700 font-bold cursor-pointer">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200/60 dark:border-slate-800">
+                    <button type="button" onClick={() => setIsCaseModalOpen(false)} className="px-4 py-2.5 border rounded-2xl font-bold text-slate-500 cursor-pointer">Cancel</button>
+                    <button type="submit" className="px-5 py-2.5 bg-[#10065F] hover:bg-[#180A8C] dark:bg-blue-600 text-white font-black rounded-2xl shadow-md uppercase tracking-wider cursor-pointer">
+                      {editingCaseId ? 'Update Test Case' : 'Save Test Case'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* EDIT SUITE SPECS MODAL */}
+          {isEditSuiteModalOpen && (
+            <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className="w-full max-w-lg bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl rounded-[32px] p-6 sm:p-8 border border-white/80 dark:border-slate-700/80 shadow-2xl space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-3">
+                  <h3 className="text-sm font-black text-[#10065F] dark:text-white uppercase tracking-wider">Edit Test Suite Specifications</h3>
+                  <button onClick={() => setIsEditSuiteModalOpen(false)} className="text-slate-400 font-bold cursor-pointer">✕</button>
+                </div>
+
+                <form onSubmit={handleSaveEditedSpecs} noValidate className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Suite Title</label>
+                    <input type="text" required value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner" />
+                  </div>
+                  <div>
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Assigned QA</label>
+                    <input type="text" value={editAssignedQa} onChange={(e) => setEditAssignedQa(e.target.value)} className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner" />
+                  </div>
+                  <div>
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Priority</label>
+                    <select value={editPriority} onChange={(e) => setEditPriority(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-bold outline-none cursor-pointer">
+                      <option value="Low" className="dark:bg-slate-900">Low</option>
+                      <option value="Medium" className="dark:bg-slate-900">Medium</option>
+                      <option value="High" className="dark:bg-slate-900">High</option>
+                      <option value="Critical" className="dark:bg-slate-900">Critical</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Description / Notes</label>
+                    <textarea rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none resize-none shadow-inner" />
+                  </div>
+                  <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                    <button type="button" onClick={() => setIsEditSuiteModalOpen(false)} className="px-4 py-2.5 border rounded-2xl font-bold text-slate-500 cursor-pointer">Cancel</button>
+                    <button type="submit" className="px-5 py-2.5 bg-[#10065F] hover:bg-[#180A8C] dark:bg-blue-600 text-white font-black uppercase tracking-wider rounded-2xl shadow-md cursor-pointer">Save Specs</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
     );
   }
@@ -1301,16 +1565,22 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
   // 2️⃣ MAIN SUITE GALLERY VIEW (WHEN NO SUITE IS OPENED)
   // =====================================================================
   return (
-    <div className={`p-4 md:p-8 min-h-[calc(100vh-73px)] font-sans ${isDarkMode ? 'dark bg-neutral-obsidian text-white' : 'bg-slate-50 text-brand-paramount'}`}>
-      <div className="w-full px-0 md:px-4 mx-auto space-y-6 md:space-y-8">
+    <div className={`p-4 md:p-8 min-h-[calc(100vh-73px)] font-sans relative overflow-hidden transition-colors duration-500 ${
+      isDarkMode ? 'dark bg-[#080C14] text-white' : 'bg-[#EBF1F6] text-slate-900'
+    }`}>
+      {/* AMBIENT BACKGROUND GLOW BLOBS */}
+      <div className="absolute top-[-5%] left-[-5%] w-[500px] h-[500px] bg-gradient-to-br from-blue-500/15 to-purple-600/15 rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-gradient-to-tl from-indigo-500/15 to-sky-400/15 rounded-full blur-[140px] pointer-events-none" />
+
+      <div className="w-full max-w-7xl mx-auto space-y-6 md:space-y-8 relative z-10">
         
-        {/* Header Bar */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {/* HEADER TOOLBAR */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl p-6 rounded-[32px] border border-white/80 dark:border-slate-800/80 shadow-xl shadow-black/5">
           <div>
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-800 dark:text-white">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[#10065F] dark:text-white">
               {showTrash ? 'Archived QA Items' : (activeTab === 'runs' ? 'Test Execution Runs' : 'Test Suites')}
             </h1>
-            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-1">
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mt-1">
               {showTrash 
                 ? 'Soft-deleted test suites and test runs.' 
                 : (activeTab === 'runs' ? 'Automated Robot Framework execution logs and manual execution history.' : 'Overview of all ad-hoc and project-assigned QA test execution suites.')}
@@ -1318,11 +1588,11 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
           </div>
 
           <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
-            <div className="flex gap-1 bg-slate-200/60 dark:bg-slate-900/60 p-1 rounded-2xl border border-slate-300/50 dark:border-slate-800 w-full md:w-auto">
+            <div className="flex gap-1 bg-white/40 dark:bg-slate-950/40 p-1.5 rounded-2xl border border-white/60 dark:border-slate-800 backdrop-blur-md w-full md:w-auto">
               <button
                 onClick={() => { setActiveTab('suites'); setShowTrash(false); }}
-                className={`flex-1 md:flex-none px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === 'suites' && !showTrash ? 'bg-[#10065F] text-white shadow-md' : 'text-slate-400 hover:text-slate-500'
+                className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === 'suites' && !showTrash ? 'bg-[#10065F] dark:bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                 }`}
               >
                 SUITES ({activeSuites.length})
@@ -1330,8 +1600,8 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
               
               <button
                 onClick={() => { setActiveTab('runs'); setShowTrash(false); }}
-                className={`flex-1 md:flex-none px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  activeTab === 'runs' && !showTrash ? 'bg-[#10065F] text-white shadow-md' : 'text-slate-400 hover:text-slate-500'
+                className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  activeTab === 'runs' && !showTrash ? 'bg-[#10065F] dark:bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                 }`}
               >
                 TEST RUNS ({activeRuns.length})
@@ -1339,8 +1609,8 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
               <button
                 onClick={() => setShowTrash(true)}
-                className={`flex-1 md:flex-none px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  showTrash ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-500'
+                className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  showTrash ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                 }`}
               >
                 ARCHIVED ({totalArchivedCount})
@@ -1350,7 +1620,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
             {!showTrash && activeTab === 'suites' && (
               <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="flex-1 md:flex-none px-4 py-2.5 rounded-xl border border-blue-500/30 bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                className="flex-1 md:flex-none px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#10065F] to-[#1a0a80] dark:from-blue-600 dark:to-indigo-600 hover:shadow-lg hover:shadow-blue-500/20 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer whitespace-nowrap"
               >
                 + CREATE SUITE
               </button>
@@ -1366,7 +1636,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                   setRunLogs('');
                   setIsRunModalOpen(true);
                 }}
-                className="flex-1 md:flex-none px-4 py-2.5 rounded-xl border border-blue-500/30 bg-[#10065F] hover:bg-[#180A8C] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                className="flex-1 md:flex-none px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#10065F] to-[#1a0a80] dark:from-blue-600 dark:to-indigo-600 hover:shadow-lg hover:shadow-blue-500/20 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-[0.98] cursor-pointer whitespace-nowrap"
               >
                 + LOG TEST RUN
               </button>
@@ -1378,7 +1648,7 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
         {!showTrash && activeTab === 'suites' && (
           <>
             {activeSuites.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {activeSuites.map((suite) => {
                   const assignedProjectName = getProjectName(suite.project_id);
 
@@ -1386,50 +1656,50 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                     <div 
                       key={suite.id}
                       onClick={() => handleOpenSuitePage(suite)}
-                      className="rounded-2xl border border-slate-200/60 dark:border-neutral-800/60 bg-white dark:bg-neutral-cardDark p-5 md:p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-all cursor-pointer group"
+                      className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/80 dark:border-slate-800/80 rounded-[28px] p-6 shadow-xl shadow-black/5 hover:shadow-2xl hover:border-blue-400/50 transition-all duration-300 flex flex-col justify-between space-y-4 cursor-pointer group"
                     >
                       <div>
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <h3 className="font-extrabold text-base md:text-lg text-slate-800 dark:text-white group-hover:text-[#10065F] dark:group-hover:text-blue-400 transition-colors">
+                            <h3 className="font-black text-lg text-[#10065F] dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                               {suite.title}
                             </h3>
-                            <div className="flex flex-wrap gap-1.5 md:gap-2 mt-1">
+                            <div className="flex flex-wrap gap-1.5 md:gap-2 mt-1.5">
                               {assignedProjectName && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 backdrop-blur-md">
                                   Project: {assignedProjectName}
                                 </span>
                               )}
 
                               {suite.assigned_qa && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 backdrop-blur-md">
                                   QA: {suite.assigned_qa}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <span className={`px-2 py-0.5 md:px-2.5 md:py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${getPriorityBadgeClass(suite.priority)}`}>
+                          <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${getPriorityBadgeClass(suite.priority)}`}>
                             {suite.priority}
                           </span>
                         </div>
 
-                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
+                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed line-clamp-2 mt-2">
                           {suite.description || "No description provided."}
                         </p>
                       </div>
 
-                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/50 flex justify-between items-center text-[10px] font-bold text-slate-400">
+                      <div className="pt-3 border-t border-white/60 dark:border-slate-800/80 flex justify-between items-center text-[10px] font-bold text-slate-400">
                         <span>Type: {suite.suite_type === 'With JIRA Ticket' ? 'JIRA Ticket' : 'Ad-Hoc Suite'}</span>
                         
                         <div className="flex items-center space-x-3">
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleMoveSuiteToTrash(suite.id); }}
-                            className="text-red-500 hover:underline uppercase tracking-wider font-extrabold cursor-pointer"
+                            className="text-rose-500 hover:text-rose-700 uppercase tracking-wider font-extrabold cursor-pointer"
                           >
                             Archive
                           </button>
                           <span className="text-[#10065F] dark:text-blue-400 group-hover:underline uppercase tracking-wider font-extrabold cursor-pointer">
-                            OPEN -&gt;
+                            OPEN &rarr;
                           </span>
                         </div>
                       </div>
@@ -1438,14 +1708,14 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 })}
               </div>
             ) : (
-              <div className="max-w-md mx-auto my-12 text-center bg-white dark:bg-neutral-cardDark border border-slate-200/60 dark:border-neutral-800/60 rounded-2xl p-8 shadow-md">
-                <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">NO TEST SUITES FOUND</h2>
-                <p className="text-xs font-medium text-slate-400 dark:text-slate-500 mt-2 mb-6 leading-relaxed">
+              <div className="max-w-md mx-auto my-12 text-center bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/80 dark:border-slate-800/80 rounded-[28px] p-8 shadow-xl shadow-black/5">
+                <h2 className="text-sm font-black text-[#10065F] dark:text-white uppercase tracking-wide">NO TEST SUITES FOUND</h2>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-2 mb-6 leading-relaxed">
                   You haven't logged any ad-hoc or JIRA test suites yet.
                 </p>
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="px-6 py-2.5 bg-[#10065F] hover:bg-[#180A8C] text-white rounded-xl text-xs font-black tracking-wider uppercase transition-all shadow-md cursor-pointer"
+                  className="px-6 py-2.5 bg-[#10065F] hover:bg-[#180A8C] dark:bg-blue-600 text-white rounded-2xl text-xs font-black tracking-wider uppercase transition-all shadow-md cursor-pointer"
                 >
                   + CREATE FIRST TEST SUITE
                 </button>
@@ -1457,46 +1727,46 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
         {/* TEST RUNS VIEW */}
         {!showTrash && activeTab === 'runs' && (
           <div className="space-y-4">
-            <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 p-6 shadow-sm">
-              <h2 className="text-sm font-black uppercase text-slate-400 tracking-wider mb-4">
+            <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[28px] border border-white/80 dark:border-slate-800/80 p-6 shadow-xl shadow-black/5 space-y-4">
+              <h2 className="text-xs font-black uppercase text-slate-400 tracking-wider">
                 Automated Robot Framework & Manual Execution Logs
               </h2>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-[10px] uppercase tracking-widest text-slate-400 font-black">
-                      <th className="p-3">Run ID</th>
-                      <th className="p-3">Test Suite Title</th>
-                      <th className="p-3">Runner Engine</th>
-                      <th className="p-3">Results (P / F / Total)</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Execution Time</th>
-                      <th className="p-3 text-right">Actions</th>
+                    <tr className="border-b border-white/60 dark:border-slate-800/80 bg-white/40 dark:bg-slate-950/40 text-[10px] uppercase tracking-widest text-slate-400 font-black">
+                      <th className="p-3.5">Run ID</th>
+                      <th className="p-3.5">Test Suite Title</th>
+                      <th className="p-3.5">Runner Engine</th>
+                      <th className="p-3.5">Results (P / F / Total)</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5">Execution Time</th>
+                      <th className="p-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                  <tbody className="divide-y divide-white/40 dark:divide-slate-800/60">
                     {activeRuns.map((run) => (
-                      <tr key={run.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
-                        <td className="p-3 font-mono font-black text-[#10065F] dark:text-blue-400">{run.runId}</td>
-                        <td className="p-3 font-bold text-slate-800 dark:text-white">{run.suiteTitle}</td>
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-blue-500/10 text-blue-600">
+                      <tr key={run.id} className="hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="p-3.5 font-mono font-black text-[#10065F] dark:text-blue-400">{run.runId}</td>
+                        <td className="p-3.5 font-bold text-slate-800 dark:text-white">{run.suiteTitle}</td>
+                        <td className="p-3.5">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 backdrop-blur-md">
                             {run.runnerType}
                           </span>
                         </td>
-                        <td className="p-3 font-mono font-bold">
-                          <span className="text-emerald-500">{run.passedCount} Passed</span> / <span className="text-red-500">{run.failedCount} Failed</span> / <span>{run.totalCount} Total</span>
+                        <td className="p-3.5 font-mono font-bold">
+                          <span className="text-emerald-500">{run.passedCount} Passed</span> / <span className="text-rose-500">{run.failedCount} Failed</span> / <span>{run.totalCount} Total</span>
                         </td>
-                        <td className="p-3">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            run.status === 'Passed' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'
+                        <td className="p-3.5">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                            run.status === 'Passed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30'
                           }`}>
                             {run.status}
                           </span>
                         </td>
-                        <td className="p-3 text-slate-400">{run.executedAt}</td>
-                        <td className="p-3 text-right space-x-3 whitespace-nowrap">
+                        <td className="p-3.5 text-slate-400">{run.executedAt}</td>
+                        <td className="p-3.5 text-right space-x-3 whitespace-nowrap">
                           <button
                             onClick={() => handleOpenEditRun(run)}
                             className="text-amber-500 hover:underline font-extrabold uppercase text-[10px] cursor-pointer"
@@ -1505,13 +1775,18 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                           </button>
                           <button
                             onClick={() => handleArchiveTestRun(run.id)}
-                            className="text-red-500 hover:underline font-extrabold uppercase text-[10px] cursor-pointer"
+                            className="text-rose-500 hover:underline font-extrabold uppercase text-[10px] cursor-pointer"
                           >
                             Archive
                           </button>
                         </td>
                       </tr>
                     ))}
+                    {activeRuns.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-slate-400 italic">No execution runs logged yet.</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1522,22 +1797,22 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
         {/* ARCHIVED VIEW */}
         {showTrash && (
           <div className="space-y-6">
-            <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 p-6 shadow-sm space-y-4">
-              <h2 className="text-sm font-black uppercase text-amber-500 tracking-wider">
+            <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[28px] border border-white/80 dark:border-slate-800/80 p-6 shadow-xl shadow-black/5 space-y-4">
+              <h2 className="text-xs font-black uppercase text-amber-500 tracking-wider">
                 Archived Test Suites ({trashedSuites.length})
               </h2>
 
               {trashedSuites.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {trashedSuites.map((suite) => (
-                    <div key={suite.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex justify-between items-center">
+                    <div key={suite.id} className="p-4 rounded-2xl border border-white/80 dark:border-slate-800 bg-white/50 dark:bg-slate-950/40 backdrop-blur-md flex justify-between items-center">
                       <div>
                         <h4 className="font-bold text-sm text-slate-800 dark:text-white">{suite.title}</h4>
-                        <span className="text-[10px] text-slate-400">Type: {suite.suite_type || 'Adhoc'}</span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">Type: {suite.suite_type || 'Adhoc'}</span>
                       </div>
                       <button
                         onClick={() => handleRestoreSuiteFromTrash(suite.id)}
-                        className="px-3 py-1 bg-emerald-500/10 text-emerald-600 rounded-lg text-xs font-bold uppercase hover:bg-emerald-500/20 transition-all cursor-pointer"
+                        className="px-3.5 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold uppercase hover:bg-emerald-500/20 transition-all cursor-pointer"
                       >
                         Restore
                       </button>
@@ -1549,8 +1824,8 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
               )}
             </div>
 
-            <div className="bg-white dark:bg-neutral-cardDark rounded-2xl border border-slate-200/60 dark:border-neutral-800 p-6 shadow-sm space-y-4">
-              <h2 className="text-sm font-black uppercase text-amber-500 tracking-wider">
+            <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[28px] border border-white/80 dark:border-slate-800/80 p-6 shadow-xl shadow-black/5 space-y-4">
+              <h2 className="text-xs font-black uppercase text-amber-500 tracking-wider">
                 Archived Test Runs ({trashedRuns.length})
               </h2>
 
@@ -1558,25 +1833,25 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-[10px] uppercase text-slate-400 font-black">
-                        <th className="p-3">Run ID</th>
-                        <th className="p-3">Suite Title</th>
-                        <th className="p-3">Runner Engine</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3 text-right">Actions</th>
+                      <tr className="border-b border-white/60 dark:border-slate-800/80 bg-white/40 dark:bg-slate-950/40 text-[10px] uppercase text-slate-400 font-black">
+                        <th className="p-3.5">Run ID</th>
+                        <th className="p-3.5">Suite Title</th>
+                        <th className="p-3.5">Runner Engine</th>
+                        <th className="p-3.5">Status</th>
+                        <th className="p-3.5 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                    <tbody className="divide-y divide-white/40 dark:divide-slate-800/60">
                       {trashedRuns.map((run) => (
                         <tr key={run.id}>
-                          <td className="p-3 font-mono font-bold text-[#10065F] dark:text-blue-400">{run.runId}</td>
-                          <td className="p-3 font-semibold text-slate-800 dark:text-white">{run.suiteTitle}</td>
-                          <td className="p-3">{run.runnerType}</td>
-                          <td className="p-3 font-bold">{run.status}</td>
-                          <td className="p-3 text-right">
+                          <td className="p-3.5 font-mono font-bold text-[#10065F] dark:text-blue-400">{run.runId}</td>
+                          <td className="p-3.5 font-semibold text-slate-800 dark:text-white">{run.suiteTitle}</td>
+                          <td className="p-3.5">{run.runnerType}</td>
+                          <td className="p-3.5 font-bold">{run.status}</td>
+                          <td className="p-3.5 text-right">
                             <button
                               onClick={() => handleRestoreTestRun(run.id)}
-                              className="px-3 py-1 bg-emerald-500/10 text-emerald-600 rounded-lg text-xs font-bold uppercase hover:bg-emerald-500/20 transition-all cursor-pointer"
+                              className="px-3.5 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold uppercase hover:bg-emerald-500/20 transition-all cursor-pointer"
                             >
                               Restore
                             </button>
@@ -1597,11 +1872,11 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
       {/* MODAL: CREATE SUITE */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-5 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800">
-            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3 mb-5">
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-lg bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl rounded-[32px] p-6 border border-white/80 dark:border-slate-700/80 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-3 mb-2">
               <div>
-                <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">Create QA Test Suite</h3>
+                <h3 className="text-sm font-black text-[#10065F] dark:text-white uppercase tracking-wider">Create QA Test Suite</h3>
                 <p className="text-[10px] text-slate-400 font-medium">Standalone test suite decoupled or linked to project containers.</p>
               </div>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">✕</button>
@@ -1609,64 +1884,64 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
             <form onSubmit={handleCreateSuite} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Test Suite Type</label>
+                <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">Test Suite Type</label>
                 <select
                   value={suiteType} onChange={(e: any) => setSuiteType(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none cursor-pointer"
+                  className="w-full px-3.5 py-2.5 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none cursor-pointer"
                 >
-                  <option value="Adhoc">Adhoc (Other)</option>
-                  <option value="With JIRA Ticket">With JIRA Ticket</option>
+                  <option value="Adhoc" className="dark:bg-slate-900">Adhoc (Other)</option>
+                  <option value="With JIRA Ticket" className="dark:bg-slate-900">With JIRA Ticket</option>
                 </select>
               </div>
 
               {suiteType === 'With JIRA Ticket' && (
                 <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">JIRA Ticket Key / ID</label>
+                  <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">JIRA Ticket Key / ID</label>
                   <input
                     type="text" required value={jiraTicket} onChange={(e) => setJiraTicket(e.target.value)}
                     placeholder="e.g., ASPD-211 or PD-1111"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none"
+                    className="w-full px-4 py-3 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Assigned QA Engineer</label>
+                <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">Assigned QA Engineer</label>
                 <input
                   type="text" value={assignedQaSuite} onChange={(e) => setAssignedQaSuite(e.target.value)}
                   placeholder="e.g. Name of QA Assigned"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none"
+                  className="w-full px-4 py-3 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Suite Title</label>
+                <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">Suite Title</label>
                 <input
                   type="text" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="e.g., Quick Regression Check - Auth API"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none"
+                  className="w-full px-4 py-3 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Description / Notes</label>
+                <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">Description / Notes</label>
                 <textarea
                   rows={3} value={newDescription} onChange={(e) => setNewDescription(e.target.value)}
                   placeholder="Add scope details or quick notes..."
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none resize-none leading-relaxed"
+                  className="w-full px-4 py-3 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none resize-none leading-relaxed shadow-inner"
                 />
               </div>
 
-              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-4">
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200/60 dark:border-slate-800 mt-4">
                 <button
                   type="button" onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 border rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all cursor-pointer"
+                  className="px-4 py-2.5 border rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit" disabled={isSubmitting}
-                  className="px-4 py-2 bg-[#10065F] hover:bg-[#180A8C] text-white font-black rounded-xl transition-all shadow-md disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2.5 bg-[#10065F] hover:bg-[#180A8C] dark:bg-blue-600 text-white font-black rounded-2xl transition-all shadow-md disabled:opacity-50 cursor-pointer uppercase tracking-wider"
                 >
                   {isSubmitting ? 'Creating...' : 'Create Suite'}
                 </button>
@@ -1678,11 +1953,11 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
       {/* MODAL: CREATE / EDIT TEST RUN */}
       {isRunModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-cardDark rounded-2xl p-5 md:p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/60 pb-3">
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-lg bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl rounded-[32px] p-6 border border-white/80 dark:border-slate-700/80 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-wider">
+                <h3 className="text-sm font-black text-[#10065F] dark:text-white uppercase tracking-wider">
                   {editingRunId ? 'Edit Test Run Details' : 'Log Test Run Session'}
                 </h3>
                 <p className="text-[10px] text-slate-400 font-medium">Record automated execution metrics and logs.</p>
@@ -1692,61 +1967,61 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
 
             <form onSubmit={handleSaveTestRun} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Target Suite Title</label>
+                <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">Target Suite Title</label>
                 <input
                   type="text" required value={runSuiteTitle} onChange={(e) => setRunSuiteTitle(e.target.value)}
                   placeholder="e.g. Auth API & Token Suite"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none"
+                  className="w-full px-4 py-3 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Runner Engine</label>
+                <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">Runner Engine</label>
                 <select
                   value={runnerType} onChange={(e: any) => setRunnerType(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none cursor-pointer"
+                  className="w-full px-3.5 py-2.5 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none cursor-pointer"
                 >
-                  <option value="Robot Framework">Robot Framework (Automated)</option>
-                  <option value="Manual">Manual Execution Run</option>
+                  <option value="Robot Framework" className="dark:bg-slate-900">Robot Framework (Automated)</option>
+                  <option value="Manual" className="dark:bg-slate-900">Manual Execution Run</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Passed Count</label>
+                  <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">Passed Count</label>
                   <input
                     type="number" min={0} value={runPassedCount} onChange={(e) => setRunPassedCount(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none"
+                    className="w-full px-4 py-3 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Failed Count</label>
+                  <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">Failed Count</label>
                   <input
                     type="number" min={0} value={runFailedCount} onChange={(e) => setRunFailedCount(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-semibold outline-none"
+                    className="w-full px-4 py-3 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wide mb-1 text-[10px]">Execution Output Logs</label>
+                <label className="block font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1 text-[10px]">Execution Output Logs</label>
                 <textarea
                   rows={3} value={runLogs} onChange={(e) => setRunLogs(e.target.value)}
                   placeholder="Paste Robot Framework log.html or console output..."
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white font-mono text-[10px] outline-none resize-none leading-relaxed"
+                  className="w-full px-4 py-3 text-xs rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-mono text-[10px] outline-none resize-none leading-relaxed shadow-inner"
                 />
               </div>
 
-              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 mt-4">
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200/60 dark:border-slate-800 mt-4">
                 <button
                   type="button" onClick={() => { setIsRunModalOpen(false); setEditingRunId(null); }}
-                  className="px-4 py-2 border rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all cursor-pointer"
+                  className="px-4 py-2.5 border rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#10065F] hover:bg-[#180A8C] text-white font-black rounded-xl transition-all shadow-md cursor-pointer"
+                  className="px-5 py-2.5 bg-[#10065F] hover:bg-[#180A8C] dark:bg-blue-600 text-white font-black rounded-2xl transition-all shadow-md cursor-pointer uppercase tracking-wider"
                 >
                   {editingRunId ? 'Update Test Run' : 'Save Test Run'}
                 </button>
