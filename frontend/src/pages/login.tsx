@@ -25,13 +25,23 @@ export default function Login({
   const [isDark, setIsDark] = useState<boolean>(propIsDarkMode ?? false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  // Sync internal state if prop updates from parent
+  // Sync internal dark mode state if prop updates from parent
   useEffect(() => {
     setIsDark(propIsDarkMode);
   }, [propIsDarkMode]);
+
+  // 💾 Check Local Storage for Remembered Email on Mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('paramount_remembered_email');
+    if (savedEmail) {
+      setUsername(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   // Bulletproof Theme Toggle Handler
   const handleToggleTheme = () => {
@@ -55,40 +65,47 @@ export default function Login({
     }
   };
 
-// Inside src/pages/login.tsx
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setErrorMessage('');
-  setIsAuthenticating(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+    setIsAuthenticating(true);
 
-  try {
-    const response = await axios.post(`${API_BASE_URL}/login`, {
-      email: username.trim(),
-      password: password
-    });
+    try {
+      const response = await axios.post(`${API_BASE_URL}/login`, {
+        email: username.trim(),
+        password: password
+      });
 
-    const user = response.data;
+      const user = response.data;
 
-    // 🔒 1. Check if the User Account is Active
-    if (user.is_active === false) {
-      setErrorMessage("Your account has been deactivated. Please contact the system administrator.");
-      return;
+      // 🔒 1. Check if the User Account is Active
+      if (user.is_active === false) {
+        setErrorMessage("Your account has been deactivated. Please contact the system administrator.");
+        return;
+      }
+
+      // 🔒 2. Check if the User's Assigned Role is Active
+      if (user.role_is_active === false || user.is_role_active === false) {
+        setErrorMessage("Your account is currently deactivated. Access denied. Contact the system administrator for assistance.");
+        return;
+      }
+
+      // 💾 3. Handle Remember Me Storage Logic
+      if (rememberMe) {
+        localStorage.setItem('paramount_remembered_email', username.trim());
+      } else {
+        localStorage.removeItem('paramount_remembered_email');
+      }
+
+      onLoginSuccess(user);
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || "Invalid username or password.";
+      setErrorMessage(detail);
+    } finally {
+      setIsAuthenticating(false);
     }
+  };
 
-    // 🔒 2. Check if the User's Assigned Role is Active
-    if (user.role_is_active === false || user.is_role_active === false) {
-      setErrorMessage("Your account is currently deactivated. Access denied. Contact the system administrator for assistance.");
-      return;
-    }
-
-    onLoginSuccess(user);
-  } catch (err: any) {
-    const detail = err.response?.data?.detail || "Invalid username or password.";
-    setErrorMessage(detail);
-  } finally {
-    setIsAuthenticating(false);
-  }
-};
   return (
     <div className={`min-h-screen w-full flex flex-col justify-between items-center p-4 md:p-6 font-sans relative overflow-hidden transition-colors duration-500 ${
       isDark ? 'dark bg-[#080C14] text-white' : 'bg-[#EBF1F6] text-slate-900'
@@ -101,10 +118,6 @@ const handleSubmit = async (e: React.FormEvent) => {
 
       {/* 📍 PINNED STRICTLY TO UPPER RIGHT CORNER ON LOGIN SCREEN */}
       <div className="fixed top-5 right-5 sm:top-6 sm:right-8 z-50 flex items-center space-x-2.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl px-3.5 py-1.5 rounded-full border border-white/80 dark:border-slate-800 shadow-md">
-        {/* <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 select-none">
-          {isDark ? '' : 'Mode'}
-        </span> */}
-
         <button
           type="button"
           role="switch"
@@ -193,10 +206,25 @@ const handleSubmit = async (e: React.FormEvent) => {
               />
             </div>
 
+            {/* 🔘 REMEMBER ME CHECKBOX */}
+            <div className="flex items-center justify-between px-1 pt-1">
+              <label className="flex items-center space-x-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-[#10065F] dark:text-blue-500 focus:ring-blue-500 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                  Remember me
+                </span>
+              </label>
+            </div>
+
             <button 
               type="submit" 
               disabled={isAuthenticating}
-              className="w-full mt-3 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider text-white bg-gradient-to-r from-[#10065F] to-[#1a0a80] dark:from-blue-600 dark:to-indigo-600 hover:shadow-lg hover:shadow-blue-500/25 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-md"
+              className="w-full mt-2 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider text-white bg-gradient-to-r from-[#10065F] to-[#1a0a80] dark:from-blue-600 dark:to-indigo-600 hover:shadow-lg hover:shadow-blue-500/25 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-md"
             >
               {isAuthenticating ? 'Signing In...' : 'Sign In'}
             </button>

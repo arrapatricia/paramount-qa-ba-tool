@@ -1521,35 +1521,117 @@ export default function TestSuites({ isDarkMode, currentUser }: TestSuitesProps)
             <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
               <div className="w-full max-w-lg bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl rounded-[32px] p-6 sm:p-8 border border-white/80 dark:border-slate-700/80 shadow-2xl space-y-4">
                 <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-3">
-                  <h3 className="text-sm font-black text-[#10065F] dark:text-white uppercase tracking-wider">Edit Test Suite Specifications</h3>
-                  <button onClick={() => setIsEditSuiteModalOpen(false)} className="text-slate-400 font-bold cursor-pointer">✕</button>
+                  <h3 className="text-sm font-black text-[#10065F] dark:text-white uppercase tracking-wider">
+                    Edit Test Suite Specifications
+                  </h3>
+                  <button onClick={() => setIsEditSuiteModalOpen(false)} className="text-slate-400 font-bold cursor-pointer hover:text-slate-600 dark:hover:text-white">✕</button>
                 </div>
 
                 <form onSubmit={handleSaveEditedSpecs} noValidate className="space-y-3.5 text-xs">
+                  {/* SUITE TYPE SELECTOR */}
                   <div>
-                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Suite Title</label>
-                    <input type="text" required value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner" />
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Test Suite Type
+                    </label>
+                    <select 
+                      value={editSuiteType} 
+                      onChange={(e: any) => setEditSuiteType(e.target.value)} 
+                      className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-bold outline-none cursor-pointer"
+                    >
+                      <option value="Adhoc" className="dark:bg-slate-900">Adhoc (Other)</option>
+                      <option value="With JIRA Ticket" className="dark:bg-slate-900">With JIRA Ticket</option>
+                    </select>
                   </div>
+
+                  {/* CONDITIONAL JIRA TICKET INPUT */}
+                  {editSuiteType === 'With JIRA Ticket' && (
+                    <div>
+                      <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                        JIRA Ticket Key / ID
+                      </label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={editJiraTicket} 
+                        onChange={(e) => setEditJiraTicket(e.target.value)} 
+                        placeholder="e.g., ASPD-211 or PD-1111" 
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner" 
+                      />
+                    </div>
+                  )}
+
+                  {/* SUITE TITLE */}
                   <div>
-                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Assigned QA</label>
-                    <input type="text" value={editAssignedQa} onChange={(e) => setEditAssignedQa(e.target.value)} className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner" />
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Suite Title
+                    </label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={editTitle} 
+                      onChange={(e) => setEditTitle(e.target.value)} 
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner" 
+                    />
                   </div>
+
+                  {/* ASSIGNED QA */}
                   <div>
-                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Priority</label>
-                    <select value={editPriority} onChange={(e) => setEditPriority(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-bold outline-none cursor-pointer">
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Assigned QA
+                    </label>
+                    <input 
+                      type="text" 
+                      value={editAssignedQa} 
+                      onChange={(e) => setEditAssignedQa(e.target.value)} 
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none shadow-inner" 
+                    />
+                  </div>
+
+                  {/* PRIORITY */}
+                  <div>
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Priority
+                    </label>
+                    <select 
+                      value={editPriority} 
+                      onChange={(e) => setEditPriority(e.target.value)} 
+                      className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-bold outline-none cursor-pointer"
+                    >
                       <option value="Low" className="dark:bg-slate-900">Low</option>
                       <option value="Medium" className="dark:bg-slate-900">Medium</option>
                       <option value="High" className="dark:bg-slate-900">High</option>
                       <option value="Critical" className="dark:bg-slate-900">Critical</option>
                     </select>
                   </div>
+
+                  {/* DESCRIPTION / NOTES */}
                   <div>
-                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">Description / Notes</label>
-                    <textarea rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none resize-none shadow-inner" />
+                    <label className="block font-black uppercase text-[10px] tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Description / Notes
+                    </label>
+                    <textarea 
+                      rows={3} 
+                      value={editDescription} 
+                      onChange={(e) => setEditDescription(e.target.value)} 
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none resize-none shadow-inner" 
+                    />
                   </div>
+
+                  {/* MODAL ACTION BUTTONS */}
                   <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                    <button type="button" onClick={() => setIsEditSuiteModalOpen(false)} className="px-4 py-2.5 border rounded-2xl font-bold text-slate-500 cursor-pointer">Cancel</button>
-                    <button type="submit" className="px-5 py-2.5 bg-[#10065F] hover:bg-[#180A8C] dark:bg-blue-600 text-white font-black uppercase tracking-wider rounded-2xl shadow-md cursor-pointer">Save Specs</button>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsEditSuiteModalOpen(false)} 
+                      className="px-4 py-2.5 border rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="px-5 py-2.5 bg-[#10065F] hover:bg-[#180A8C] dark:bg-blue-600 text-white font-black uppercase tracking-wider rounded-2xl shadow-md cursor-pointer transition-all"
+                    >
+                      Save Specs
+                    </button>
                   </div>
                 </form>
               </div>
