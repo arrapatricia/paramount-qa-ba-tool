@@ -9,7 +9,7 @@ interface Project {
   devAssignee: string;
   qaAssignee: string;
   baAssignee: string;
-  status: 'Active' | 'Inactive';
+  status: 'Active' | 'Inactive' | 'Archived' | 'Completed';
   createdDate: string;
   archivedAt?: string | null;
 }
@@ -296,7 +296,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
         <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-lg bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl rounded-[32px] p-6 sm:p-8 border border-white/80 dark:border-slate-700/80 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-3">
-              <h3 className="text-sm font-black text-[#10065F] dark:text-white uppercase tracking-wider">Initialize Project Workspace</h3>
+              <h3 className="text-sm font-black text-[#10065F] dark:text-white uppercase tracking-wider">Create New Project</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white font-bold cursor-pointer">✕</button>
             </div>
             
@@ -306,7 +306,7 @@ export default function Projects({ isDarkMode, onOpenProject }: ProjectsProps) {
                 <input 
                   type="text" required value={newName} onChange={(e) => setNewName(e.target.value)}
                   className="w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
-                  placeholder="e.g., Claims Processing Engine"
+                  placeholder="e.g., New Website Redesign"
                 />
               </div>
               <div>

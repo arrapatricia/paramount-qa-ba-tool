@@ -55,26 +55,40 @@ export default function Login({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-    setIsAuthenticating(true);
+// Inside src/pages/login.tsx
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setErrorMessage('');
+  setIsAuthenticating(true);
 
-    try {
-      const response = await axios.post(`${API_BASE_URL}/login`, {
-        email: username.trim(),
-        password: password
-      });
+  try {
+    const response = await axios.post(`${API_BASE_URL}/login`, {
+      email: username.trim(),
+      password: password
+    });
 
-      onLoginSuccess(response.data);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail || "Invalid username or password.";
-      setErrorMessage(detail);
-    } finally {
-      setIsAuthenticating(false);
+    const user = response.data;
+
+    // 🔒 1. Check if the User Account is Active
+    if (user.is_active === false) {
+      setErrorMessage("Your account has been deactivated. Please contact the system administrator.");
+      return;
     }
-  };
 
+    // 🔒 2. Check if the User's Assigned Role is Active
+    if (user.role_is_active === false || user.is_role_active === false) {
+      setErrorMessage("Your account is currently deactivated. Access denied. Contact the system administrator for assistance.");
+      return;
+    }
+
+    onLoginSuccess(user);
+  } catch (err: any) {
+    const detail = err.response?.data?.detail || "Invalid username or password.";
+    setErrorMessage(detail);
+  } finally {
+    setIsAuthenticating(false);
+  }
+};
   return (
     <div className={`min-h-screen w-full flex flex-col justify-between items-center p-4 md:p-6 font-sans relative overflow-hidden transition-colors duration-500 ${
       isDark ? 'dark bg-[#080C14] text-white' : 'bg-[#EBF1F6] text-slate-900'
@@ -85,39 +99,37 @@ export default function Login({
       <div className="absolute bottom-[-10%] right-[-10%] w-[550px] h-[550px] bg-gradient-to-tl from-indigo-500/20 to-sky-400/20 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute top-[40%] right-[15%] w-[300px] h-[300px] bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
 
-      {/* TOP BAR: LIQUID GLASS SLIDING TOGGLE SWITCH */}
-      <div className="w-full max-w-6xl flex justify-end px-2 pt-2 z-20">
-        <div className="flex items-center space-x-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl px-4 py-2 rounded-full border border-white/60 dark:border-slate-700/50 shadow-lg shadow-black/5 transition-all">
-          <span className="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 select-none">
-            {isDark ? 'Mode' : 'Mode'}
-          </span>
+      {/* 📍 PINNED STRICTLY TO UPPER RIGHT CORNER ON LOGIN SCREEN */}
+      <div className="fixed top-5 right-5 sm:top-6 sm:right-8 z-50 flex items-center space-x-2.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl px-3.5 py-1.5 rounded-full border border-white/80 dark:border-slate-800 shadow-md">
+        {/* <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 select-none">
+          {isDark ? '' : 'Mode'}
+        </span> */}
 
-          <button
-            type="button"
-            role="switch"
-            aria-checked={isDark}
-            onClick={handleToggleTheme}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none ${
-              isDark ? 'bg-blue-600' : 'bg-slate-300'
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isDark}
+          onClick={handleToggleTheme}
+          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none ${
+            isDark ? 'bg-blue-600' : 'bg-slate-300'
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-300 ease-in-out flex items-center justify-center ${
+              isDark ? 'translate-x-4' : 'translate-x-0'
             }`}
           >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-300 ease-in-out flex items-center justify-center ${
-                isDark ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            >
-              {isDark ? (
-                <svg className="w-3 h-3 text-slate-900" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                </svg>
-              ) : (
-                <svg className="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 100 2h1z" clipRule="evenodd" />
-                </svg>
-              )}
-            </span>
-          </button>
-        </div>
+            {isDark ? (
+              <svg className="w-2.5 h-2.5 text-slate-900" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+              </svg>
+            ) : (
+              <svg className="w-2.5 h-2.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 100 2h1z" clipRule="evenodd" />
+              </svg>
+            )}
+          </span>
+        </button>
       </div>
 
       {/* MAIN LIQUID GLASS CARD */}
