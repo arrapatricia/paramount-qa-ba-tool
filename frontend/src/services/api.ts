@@ -1,8 +1,11 @@
 import axios from 'axios';
 
-// Create a configured Axios instance pointing to your FastAPI local port
+// Central API Base URL
+export const API_BASE_URL = 'https://paramount-qa-ba-tool-production.up.railway.app';
+
+// Configured Axios Instance
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://paramount-qa-backend.herokuapp.com',
+  baseURL: import.meta.env.VITE_API_BASE_URL || API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -53,12 +56,10 @@ export const userAPI = {
     const res = await API.get('/users');
     return res.data;
   },
-  // Sends registration details along with the temporary plain-text password
   create: async (data: { first_name: string; last_name: string; email: string; password: string; is_active: boolean; role_name: string }) => {
     const res = await API.post('/users', data);
     return res.data;
   },
-  // Edits user directory details (does not touch or overwrite password hashes)
   update: async (id: number, data: { first_name: string; last_name: string; email: string; is_active: boolean; role_name: string }) => {
     const res = await API.put(`/users/${id}`, data);
     return res.data;
@@ -67,7 +68,6 @@ export const userAPI = {
     const res = await API.patch(`/users/${id}/toggle-status`);
     return res.data;
   },
-  // Overwrites password with a secure new hash on the backend
   resetPassword: async (id: number, data: { new_password: string }) => {
     const res = await API.put(`/users/${id}/reset-password`, data);
     return res.data;
@@ -78,6 +78,9 @@ export const userAPI = {
   },
 };
 
+// ==========================================
+// 📝 NOTES API CALLS
+// ==========================================
 export const noteAPI = {
   getAll: async () => {
     const res = await API.get('/notes');
@@ -113,8 +116,11 @@ export const qaSuiteAPI = {
     const res = await API.post('/qa-suites', data);
     return res.data;
   },
-}
-// Add these to services/api.ts
+};
+
+// ==========================================
+// 📊 TEST PLAN & RUN API CALLS
+// ==========================================
 export interface TestRunData {
   id?: string;
   run_id: string;
@@ -149,4 +155,48 @@ export const testRunAPI = {
     const res = await API.post('/test-runs', data);
     return res.data;
   },
+};
+
+// ==========================================
+// 📜 DOCUMENT VERSIONING API CALLS
+// ==========================================
+export interface DocumentVersion {
+  id: string;
+  versionNumber: number;
+  versionName: string;
+  title: string;
+  content: string;
+  publishedBy: string;
+  publishedAt: string;
+  changelogNote?: string;
+}
+
+export const docVersionAPI = {
+  getVersions: async (projectId: string | number): Promise<DocumentVersion[]> => {
+    try {
+      const response = await API.get(`/projects/${projectId}/versions`);
+      return response.data;
+    } catch {
+      // Fallback to local storage if API endpoint is unavailable
+      const saved = localStorage.getItem(`qa_doc_versions_${projectId}`);
+      return saved ? JSON.parse(saved) : [];
+    }
+  },
+
+  saveVersion: async (projectId: string | number, versionData: Omit<DocumentVersion, 'id'>): Promise<DocumentVersion> => {
+    const newVersion: DocumentVersion = {
+      ...versionData,
+      id: `ver-${Date.now()}`
+    };
+    try {
+      const response = await API.post(`/projects/${projectId}/versions`, newVersion);
+      return response.data;
+    } catch {
+      // Fallback to local storage
+      const existing = JSON.parse(localStorage.getItem(`qa_doc_versions_${projectId}`) || '[]');
+      const updated = [newVersion, ...existing];
+      localStorage.setItem(`qa_doc_versions_${projectId}`, JSON.stringify(updated));
+      return newVersion;
+    }
+  }
 };

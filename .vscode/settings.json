@@ -2,5 +2,6 @@
     "cSpell.words": [
         "ASPD",
         "WEBSERVICE"
-    ]
+    ],
+    "locust.autoSetup": "never"
 }
