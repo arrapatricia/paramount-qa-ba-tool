@@ -101,8 +101,6 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
   // Editor states
   const [editorMode, setEditorMode] = useState<'visual' | 'code'>('visual');
   const [newPageTitle, setNewPageTitle] = useState<string>('');
-  const [aiPrompt, setAiPrompt] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [notes, setNotes] = useState<string>('');
   const [isNavOpen, setIsNavOpen] = useState<boolean>(true);
 
@@ -208,29 +206,7 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
     logAudit(`Removed tag: "${tagToRemove}"`);
   };
 
-  const handleAiGenerate = async (_promptText: string) => {
-    if (pages.length === 0) {
-      alert("Please create at least one BA Page to append AI requirements!");
-      return;
-    }
-    setIsGenerating(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    const aiResponse = `
-<h3>AI Generated Requirement Additions</h3>
-<ul>
-  <li><strong>Functional Rule:</strong> The system must enforce high-security inputs before parsing data.</li>
-  <li><strong>QA Assertion:</strong> Verify transaction latency returns sub-200ms payloads under peak loads.</li>
-</ul>`;
-    
-    handlePageContentChange(pages[0].id, pages[0].content + aiResponse);
-    logAudit(`Appended AI suggestion to: "${pages[0].title}"`);
-
-    setIsGenerating(false);
-    setAiPrompt('');
-  };
-
-  // 🚀 Publish New Snapshot Version with Correct Increment
+  // 🚀 Save New Snapshot Version with Correct Increment
   const handlePublishNewVersion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pages.length === 0) {
@@ -238,7 +214,6 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
       return;
     }
 
-    // Correctly calculate next incremental version number
     const maxExisting = versions.length > 0 ? Math.max(...versions.map(v => v.versionNumber || 0)) : 0;
     const nextVerNumber = maxExisting + 1;
 
@@ -566,26 +541,6 @@ export default function Documentation({ isDarkMode, onBackToProjects, selectedPr
                   />
                   <button type="submit" className="px-3 py-1.5 bg-[#10065F] dark:bg-blue-600 text-white rounded-lg text-xs font-extrabold cursor-pointer shrink-0">+</button>
                 </form>
-              </div>
-
-              {/* AI Companion */}
-              <div className="border-t border-white/60 dark:border-slate-800/80 pt-4 space-y-3">
-                <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  BA AI Companion
-                </h3>
-                <textarea 
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="Ask AI to write specs..."
-                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-950/40 text-slate-800 dark:text-white placeholder-slate-400 h-20 xl:h-24 resize-none shadow-inner"
-                />
-                <button
-                  disabled={isGenerating || !aiPrompt.trim()}
-                  onClick={() => handleAiGenerate(aiPrompt)}
-                  className="w-full py-2 rounded-xl bg-[#10065F] hover:bg-[#180A8C] dark:bg-blue-600 text-white text-xs font-extrabold disabled:opacity-50 cursor-pointer shadow-sm transition-all"
-                >
-                  {isGenerating ? 'Appending...' : 'Append to Document'}
-                </button>
               </div>
 
             </div>
