@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Central API Base URL
-export const API_BASE_URL = 'https://paramount-qa-ba-tool-production.up.railway.app';
+export const API_BASE_URL = 'http://127.0.0.1:8000';
 
 // Configured Axios Instance
 const API = axios.create({

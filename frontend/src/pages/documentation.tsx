@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import logoDocs from '../assets/logo_docs.png';
 
-const API_BASE_URL = 'https://paramount-qa-ba-tool-production.up.railway.app';
+const API_BASE_URL = 'http://127.0.0.1:8000'; // Make sure it uses this for local!
 
 interface DocPage {
   id: string;

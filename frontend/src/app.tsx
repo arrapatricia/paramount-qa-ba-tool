@@ -5,6 +5,7 @@ import Projects from './pages/projects';
 import Documentation from './pages/documentation';
 import TestSuites from './pages/testsuites';
 import SystemsDirectory from './pages/systems';
+import Onboarding from './pages/onboarding';
 import { userAPI } from './services/api';
 
 // Logo Assets
@@ -36,8 +37,8 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // Navigation State
-  const [currentView, setCurrentView] = useState<'login' | 'systems' | 'projects' | 'test-suites' | 'users' | 'documentation'>('login');
+  // Navigation State (Added 'onboarding' view)
+  const [currentView, setCurrentView] = useState<'login' | 'systems' | 'projects' | 'test-suites' | 'users' | 'documentation' | 'onboarding'>('login');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   // Selected Project in Workspace
@@ -87,7 +88,6 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const formattedDate = currentTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const formattedTime = currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
   const toggleTheme = () => setIsDarkMode(prev => !prev);
@@ -263,6 +263,18 @@ export default function App() {
                 Manage Users
               </button>
             )}
+
+            {/* 🚀 QA/BA ONBOARDING GUIDE BUTTON */}
+            <button 
+              onClick={() => { setCurrentView('onboarding'); setActiveProjectId(null); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === 'onboarding'
+                  ? 'bg-gradient-to-r from-[#10065F] to-[#1a0a80] dark:from-blue-600 dark:to-indigo-600 text-white shadow-md' 
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-slate-800/50'
+              }`}
+            >
+              Onboarding Guide
+            </button>
           </nav>
         )}
 
@@ -348,10 +360,6 @@ export default function App() {
 
           {/* 🌙 UPPER RIGHT CORNER LIGHT/DARK TOGGLE */}
           <div className="flex items-center space-x-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/80 dark:border-slate-700/60 shadow-xs shrink-0">
-            {/* <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-300 select-none">
-              {isDarkMode ? 'Dark' : 'Light'}
-            </span> */}
-
             <button
               type="button"
               role="switch"
@@ -406,6 +414,11 @@ export default function App() {
           ) : (
             <Projects isDarkMode={isDarkMode} onOpenProject={handleOpenProject} />
           )
+        )}
+
+        {/* 🚀 ONBOARDING VIEW ROUTE */}
+        {currentView === 'onboarding' && (
+          <Onboarding isDarkMode={isDarkMode} onBackToProjects={() => setCurrentView('systems')} />
         )}
 
         {/* 🟢 OPENED PROJECT WORKSPACE WITH LIQUID GLASS SIDEBAR */}
@@ -487,7 +500,7 @@ export default function App() {
                       title="Project Test Suites"
                     >
                       <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L5.6 15.12a2 2 0 00-1.168.14L3 16l1.328 3.985a2 2 0 001.205 1.258l2.916 1.166a6 6 0 003.86-.517l.318-.158a6 6 0 013.86-.517l2.387.477a2 2 0 001.693-.574l1.861-[1.861a2 2 0 00.32-2.324l-1.32-2.64z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L5.6 15.12a2 2 0 00-1.168.14L3 16l1.328 3.985a2 2 0 001.205 1.258l2.916 1.166a6 6 0 003.86-.517l.318-.158a6 6 0 013.86-.517l2.387.477a2 2 0 001.693-.574l1.861-1.861a2 2 0 00.32-2.324l-1.32-2.64z" />
                       </svg>
                       {!isSidebarCollapsed && <span>Project Test Suites</span>}
                     </button>
